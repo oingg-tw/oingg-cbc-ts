@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// 10年期政府公債次級市場殖利率月資料，由 /api/ingest/gov-bond-yield-10y 觸發向央行統計資料庫 API
+/// （FileName=EG43M01en，"29.Interest Rates -G.Capital Market Interest Rates By Period"）抓取，
+/// 只取回應 data.structure.Table1 第 20 個欄位「Bond market-10-year gov't bond rates in secondary
+/// market」（次級市場實際成交殖利率）。刻意不用第 4 欄「Government bonds-10-year」——那欄未標明是
+/// 發行端得標利率還是次級市場殖利率，且跟公司債/銀行債那組信用利差資料混在同一張表，用來當 CAPM
+/// 無風險利率不夠乾淨；次級市場殖利率才是跟 Beta（daily_stock_price）、市場風險溢酬同一種「市場
+/// 觀察到的價格」，可以直接放進同一個 CAPM 公式。EG43M01en 整份表還有其餘 19 個公司債/銀行債/央行
+/// 存單欄位，本表不存——跟這個用途無關。存的是月頻率百分比數字（例如 1.234 代表 1.234%），不是小數。
+model MonthlyGovBondYield10y {
+  year  Int // 西元年
+  month Int // 1-12
+
+  yieldRate Decimal @map("yield_rate") @db.Decimal(8, 4)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@id([year, month])
+  @@map("monthly_gov_bond_yield_10y")
+}
