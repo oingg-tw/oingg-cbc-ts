@@ -4,5 +4,5 @@
  */
 export const config = {
   isProduction: process.env.NODE_ENV === 'production',
-  port: process.env.PORT || 8082,
+  port: process.env.PORT || 8084,
 };

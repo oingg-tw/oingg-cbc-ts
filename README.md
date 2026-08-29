@@ -75,6 +75,8 @@ cp .env.example .env   # fill in DATABASE_URL / DIRECT_URL
 pnpm dev                # tsx watch src/index.ts
 ```
 
-`pnpm dev` starts the API on `PORT` (default 8082) — chosen to not collide
-with oingg-mops-ts (8003) or oingg-ratios-ts (8081) when running side by
-side. Swagger docs are served at `/api-docs`.
+`pnpm dev` starts the API on `PORT` (default 8084) — part of the ecosystem's
+shared port allocation maintained in oingg-conductor-ts's
+[`docs/conventions.md`](../oingg-conductor-ts/docs/conventions.md), so it
+doesn't collide with the other services when running side by side. Swagger
+docs are served at `/api-docs`.
