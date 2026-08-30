@@ -28,3 +28,39 @@ model MonthlyGovBondYield10y {
   @@id([year, month])
   @@map("monthly_gov_bond_yield_10y")
 }
+
+/// 財政部統計處《中華民國稅務行業標準分類（第9次修訂）》代碼字典，一列對應五層階層（大/中/小/細/
+/// 子類）中的一個節點——不是只存葉節點，而是每一層都各自存一列，欄位裡自己那一層填自己的 code，
+/// 上層祖先代碼另外存在 sectionCode/divisionCode/.../classCode 欄位，方便直接用某一層代碼過濾
+/// （例如 WHERE section_code = 'K' 抓整個金融及保險業）。五種代碼格式（大類 1 碼英文字母、中類 2 碼
+/// 數字、小類 3 碼、細類 4 碼、子類「4碼-2碼」）彼此定長不重疊，所以 code 本身就能直接當全域唯一鍵，
+/// 不用另外疊代理鍵。這是靜態參考資料，不是像其他 domain 那樣定期向 CBC API 抓的時序資料，用一次性
+/// seed script 匯入，之後只有官方改版才會變動。用途：解碼經濟部商工行政資料開放平台「公司行號營業
+/// 項目代碼表」回傳的 Dgbas 欄位（4 碼細類代碼），展開成公司的完整大/中/小/細類產業階層。
+model TaxIndustryClassification {
+  code  String @id // 這一列自己所在那一層的代碼，例如大類"A"、中類"01"、小類"011"、細類"0111"、子類"0111-00"
+  level String // section | division | group | class | subclass，對應大/中/小/細/子類
+
+  sectionCode  String? @map("section_code") // 大類代碼（自己是大類時等於 code）
+  divisionCode String? @map("division_code") // 中類代碼
+  groupCode    String? @map("group_code") // 小類代碼
+  classCode    String? @map("class_code") // 細類代碼
+  subclassCode String? @map("subclass_code") // 子類代碼（自己是子類時等於 code）
+
+  nameZh String  @map("name_zh") // 行業名稱（中文）
+  nameEn String? @map("name_en") // Description（英文）
+
+  definition String? @map("definition") @db.Text // 定義說明
+  exclusions String? @map("exclusions") @db.Text // 「不包括」排除規則原文
+
+  priorRevisionCode String? @map("prior_revision_code") // 對照第8次修訂分類編號，用於串接歷史資料
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([sectionCode])
+  @@index([divisionCode])
+  @@index([groupCode])
+  @@index([classCode])
+  @@map("tax_industry_classification")
+}
