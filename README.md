@@ -1,4 +1,4 @@
-# oingg-cbc-ts
+# oingg-gov-ts
 
 Ingests data from the Central Bank of the Republic of China (Taiwan)'s
 Statistical Database API into Postgres, in the same style as its sibling

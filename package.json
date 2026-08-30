@@ -1,5 +1,5 @@
 {
-  "name": "oingg-cbc-ts",
+  "name": "oingg-gov-ts",
   "version": "1.0.0",
   "description": "Ingests data from the Central Bank of the Republic of China (Taiwan) Statistical Database API into a Postgres database.",
   "main": "src/index.ts",
