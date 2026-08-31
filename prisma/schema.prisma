@@ -64,3 +64,46 @@ model TaxIndustryClassification {
   @@index([classCode])
   @@map("tax_industry_classification")
 }
+
+/// 公司主檔，由外部呼叫 POST /api/ingest/company-profile 帶入「證券代碼＋統編」登記時建立/更新。
+/// taxId（統一編號）是 GCIS 商工登記資料本身的鍵，stockCode（證券代碼）是呼叫端自己配對好才傳進來
+/// 的——這個服務不驗證兩者是否真的對應同一家公司，也不負責從證券代碼反查統編（那屬於以證券代碼為
+/// 主鍵的服務，例如 oingg-mops-ts，的職責）。stockCode 設 @unique 是為了讓同一證券代碼不會意外登記
+/// 到兩個不同統編下。companySetupDate 故意存 GCIS 原始格式（民國年月日無分隔，例如"0760221"）不轉型
+/// 別，避免猜錯民國/西元換算規則。
+model CompanyProfile {
+  taxId     String @id @map("tax_id") // 統一編號（GCIS Business_Accounting_NO），8碼數字
+  stockCode String @unique @map("stock_code") // 證券代碼，登記時由呼叫端提供
+
+  companyName       String @map("company_name")
+  companyStatus     String @map("company_status")
+  companyStatusDesc String @map("company_status_desc")
+  companySetupDate  String @map("company_setup_date")
+
+  businessItems CompanyBusinessItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("company_profiles")
+}
+
+/// CompanyProfile 底下的營業項目快照，來源是登記當下 GCIS 回應的 Cmp_Business 陣列。GCIS 每次回應
+/// 都是「當下完整清單」而非增量，所以每次重新登記時這張表整批刪除重建（見 companyProfile/service.ts），
+/// 不逐筆比對更新。itemCode 對應 Business_Item：GCIS 這個欄位有時是空白（只有空格），代表這一列其實
+/// 是「所營事業資料」的自由文字說明、不是代碼化項目，這種情況存 null。這裡的代碼格式（例如"CC01080"）
+/// 跟 TaxIndustryClassification 的代碼格式不同，是經濟部商業登記自己的行業代碼，兩者尚未建立對照，
+/// 不能直接拿 TaxIndustryClassification 解碼。
+model CompanyBusinessItem {
+  id      Int            @id @default(autoincrement())
+  taxId   String         @map("tax_id")
+  company CompanyProfile @relation(fields: [taxId], references: [taxId], onDelete: Cascade)
+
+  seqNo    String  @map("seq_no") // Business_Seq_NO，GCIS 回應裡的原始排序
+  itemCode String? @map("item_code") // Business_Item，空白視為 null
+  itemDesc String  @map("item_desc") // Business_Item_Desc
+
+  @@unique([taxId, seqNo])
+  @@index([itemCode])
+  @@map("company_business_items")
+}
