@@ -38,7 +38,7 @@ const registerCompanyProfileCore = async (stockCode: string, taxId: string, forc
     try {
       const existing = await prisma.companyProfile.findUnique({
         where: { taxId },
-        include: { businessItems: { orderBy: { seqNo: 'asc' } } },
+        include: { businessItems: { orderBy: { position: 'asc' } } },
       });
       // 已經有資料就跳過，不打 GCIS——這條路刻意不檢查 stockCode 是否跟既有資料一致，帶 force=true
       // 才會真的重新抓取並覆寫（包含 stockCode）。
@@ -84,8 +84,9 @@ const registerCompanyProfileCore = async (stockCode: string, taxId: string, forc
       // GCIS 回應是「當下完整清單」而非增量，整批刪除重建比逐筆比對更新簡單也更不容易留下髒資料。
       await tx.companyBusinessItem.deleteMany({ where: { taxId } });
       await tx.companyBusinessItem.createMany({
-        data: record.Cmp_Business.map((item) => ({
+        data: record.Cmp_Business.map((item, position) => ({
           taxId,
+          position, // 陣列索引，不是 Business_Seq_NO——後者實測會在同一份回應裡重複，見 schema.prisma 註解
           seqNo: item.Business_Seq_NO,
           itemCode: item.Business_Item.trim() === '' ? null : item.Business_Item,
           itemDesc: item.Business_Item_Desc,
@@ -94,15 +95,21 @@ const registerCompanyProfileCore = async (stockCode: string, taxId: string, forc
 
       return tx.companyProfile.findUniqueOrThrow({
         where: { taxId },
-        include: { businessItems: { orderBy: { seqNo: 'asc' } } },
+        include: { businessItems: { orderBy: { position: 'asc' } } },
       });
     });
 
     return { success: true, profile };
   } catch (error) {
-    // stockCode 設了 @unique：同一證券代碼已經登記在別的統編下時，Prisma 丟 P2002，轉成好懂的錯誤訊息。
+    // P2002 可能來自兩個不同的 unique constraint，不能一律當成 stockCode 衝突（之前這裡曾經
+    // 不分青紅皂白都回「證券代碼已登記在其他統編下」，結果 company_business_items 的
+    // (tax_id, position) 撞到時也被貼上同一個誤導訊息）——用 error.meta.target 分辨是哪個欄位。
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return { success: false, error: `證券代碼 ${stockCode} 已登記在其他統編下，無法重複登記。` };
+      const target = (error.meta?.target as string[] | string | undefined) ?? [];
+      const targetsStockCode = Array.isArray(target) ? target.includes('stock_code') : target === 'stock_code';
+      if (targetsStockCode) {
+        return { success: false, error: `證券代碼 ${stockCode} 已登記在其他統編下，無法重複登記。` };
+      }
     }
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }

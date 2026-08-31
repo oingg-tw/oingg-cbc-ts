@@ -94,16 +94,22 @@ model CompanyProfile {
 /// 是「所營事業資料」的自由文字說明、不是代碼化項目，這種情況存 null。這裡的代碼格式（例如"CC01080"）
 /// 跟 TaxIndustryClassification 的代碼格式不同，是經濟部商業登記自己的行業代碼，兩者尚未建立對照，
 /// 不能直接拿 TaxIndustryClassification 解碼。
+///
+/// position（不是 seqNo）才是唯一鍵：實測發現 GCIS 的 Business_Seq_NO 在不少公司的回應裡會重複
+/// （例如同一個統編裡兩筆都是"0001"），不是穩定的識別碼，拿它當 @@unique 曾經在 createMany 時
+/// 直接撞 P2002。position 是我們自己在寫入時用陣列索引（0-based）產生的，保證同一次回應裡不會重複，
+/// 用它保留原始排序、也用它當唯一鍵；seqNo 純粹存 GCIS 原始值供參考，不再拿來保證唯一。
 model CompanyBusinessItem {
   id      Int            @id @default(autoincrement())
   taxId   String         @map("tax_id")
   company CompanyProfile @relation(fields: [taxId], references: [taxId], onDelete: Cascade)
 
-  seqNo    String  @map("seq_no") // Business_Seq_NO，GCIS 回應裡的原始排序
+  position Int    @map("position") // 該筆在 GCIS 回應 Cmp_Business 陣列裡的 0-based 索引，用來排序也用來保證唯一
+  seqNo    String @map("seq_no") // Business_Seq_NO，GCIS 原始值，僅供參考（不保證唯一，見上方註解）
   itemCode String? @map("item_code") // Business_Item，空白視為 null
   itemDesc String  @map("item_desc") // Business_Item_Desc
 
-  @@unique([taxId, seqNo])
+  @@unique([taxId, position])
   @@index([itemCode])
   @@map("company_business_items")
 }
