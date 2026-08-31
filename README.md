@@ -1,14 +1,21 @@
 # oingg-gov-ts
 
-Ingests data from the Central Bank of the Republic of China (Taiwan)'s
-Statistical Database API into Postgres, in the same style as its sibling
-[oingg-mops-ts](https://github.com/oingg-tw/oingg-mops-ts).
+Ingests data from Taiwan government sources (the Central Bank's Statistical
+Database API, the Ministry of Finance, and others as they come up) into
+Postgres, in the same style as its sibling
+[oingg-mops-ts](https://github.com/oingg-tw/oingg-mops-ts). Scope isn't
+limited to any one agency — any Taiwan government data source is fair game.
 
-**Status: skeleton only.** The server boots, connects to the DB, and serves
-`/api-docs`, but no domains (exchange rates, interest rates, etc.) are
-implemented yet — that's the next step, done one domain at a time.
+**Status: early.** The server boots, connects to the DB, and serves
+`/api-docs`. A few domains are implemented (10y government bond yield from
+CBC, tax industry classification from the Ministry of Finance) — more are
+added one at a time, from whichever agency has the data.
 
 ## The CBC API
+
+CBC's Statistical Database API is the first and so far primary data source.
+Other agencies may need their own client under `src/shared/` (see
+`cbcClient.ts` for the pattern) if their API shape differs.
 
 ```
 GET https://cpx.cbc.gov.tw/API/DataAPI/Get?FileName={ItemCode}
@@ -42,13 +49,14 @@ src/
     errorHandler.ts       # last-resort express error handler
     serverInfo.ts         # startup timing, exposed on GET /
     cbcClient.ts          # fetchCbcItem(itemCode) — the one place that talks to the CBC API
+                           # (add a sibling client here for other agencies as needed)
   domains/
     system/root.ts        # health check (GET /)
     <domain>/              # one folder per data category, added as needed:
       route.ts              #   Express router + @swagger docs
       controller.ts          #   HTTP layer: parse request, call service, shape response
-      service.ts              #   orchestrates: check DB → fetch from CBC → parse → persist
-      parser.ts                #   raw CBC dataset -> typed rows
+      service.ts              #   orchestrates: check DB → fetch from source → parse → persist
+      parser.ts                #   raw source data -> typed rows
       ingest.ts (optional)      #   DB upsert logic, if it's more than a one-liner in service.ts
       types.ts                  #   domain-specific types
 prisma/
@@ -57,10 +65,15 @@ prisma/
 
 ## Adding a new domain
 
-1. Pick an item from [CBC-ITEM-CODES.md](./CBC-ITEM-CODES.md).
-2. Call `fetchCbcItem(itemCode)` from `src/shared/cbcClient.ts` against the
-   real endpoint and inspect the real `header`/`dataset`/`structure` shape —
-   don't guess the schema from the item name alone.
+Any Taiwan government data source is in scope, not just CBC — pick whatever
+agency has the data you need.
+
+1. Pick a data source. For CBC, pick an item from
+   [CBC-ITEM-CODES.md](./CBC-ITEM-CODES.md). For another agency, find its API
+   (or other structured export) and fetch a real response before writing
+   anything — don't guess the schema from docs or the item name alone.
+2. If the source isn't CBC, add a client for it under `src/shared/`
+   following the pattern in `cbcClient.ts`.
 3. Add a `src/domains/<domain>/` folder following the layout above.
 4. Add a Prisma model in `prisma/schema.prisma` (field naming / `@map`
    conventions should match oingg-mops-ts's schema) and run
