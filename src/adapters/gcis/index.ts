@@ -30,7 +30,12 @@ let lastRequestAt = 0;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const fetchCompanyBusinessItems = async (businessAccountingNo: string): Promise<GcisCompanyRecord[]> => {
+// 重試只針對「打不到／回應非 200」這種看起來像暫時性的失敗；「查無此統編」是 GCIS 回傳 HTTP 200
+// 但 body 空字串，正常回傳空陣列而不丟例外，不會走到這個重試邏輯——重試空結果沒有意義。
+const MAX_RETRIES = 2; // 最多共嘗試 3 次（1 次原始 + 2 次重試）
+const RETRY_DELAY_MS = 2000; // 重試間隔遞增：第 1 次重試等 2 秒、第 2 次等 4 秒
+
+const requestOnce = async (businessAccountingNo: string): Promise<GcisCompanyRecord[]> => {
   const elapsed = Date.now() - lastRequestAt;
   if (elapsed < MIN_REQUEST_INTERVAL_MS) {
     await sleep(MIN_REQUEST_INTERVAL_MS - elapsed);
@@ -49,4 +54,19 @@ export const fetchCompanyBusinessItems = async (businessAccountingNo: string): P
   const text = await response.text();
   if (text.trim() === '') return [];
   return JSON.parse(text) as GcisCompanyRecord[];
+};
+
+export const fetchCompanyBusinessItems = async (businessAccountingNo: string): Promise<GcisCompanyRecord[]> => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await requestOnce(businessAccountingNo);
+    } catch (error) {
+      lastError = error;
+      if (attempt < MAX_RETRIES) {
+        await sleep(RETRY_DELAY_MS * (attempt + 1));
+      }
+    }
+  }
+  throw lastError;
 };

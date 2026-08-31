@@ -5,13 +5,20 @@ import type { RegisterCompanyProfileResult, CompanyProfileWithBusinessItems } fr
 
 export const registerCompanyProfile = async (stockCode: string, taxId: string, force = false): Promise<RegisterCompanyProfileResult> => {
   if (!force) {
-    const existing = await prisma.companyProfile.findUnique({
-      where: { taxId },
-      include: { businessItems: { orderBy: { seqNo: 'asc' } } },
-    });
-    // 已經有資料就跳過，不打 GCIS——這條路刻意不檢查 stockCode 是否跟既有資料一致，帶 force=true
-    // 才會真的重新抓取並覆寫（包含 stockCode）。
-    if (existing) return { success: true, profile: existing, skipped: true };
+    // 包 try/catch 是因為這個 function 會在批次 ingest 的迴圈裡被逐筆呼叫（見
+    // companyProfile/controller.ts）：這裡如果不接住例外直接往外丟，會讓單一統編的 DB 查詢失敗
+    // 中斷整批後面還沒處理的項目，而不是只記那一筆失敗、繼續跑下一筆。
+    try {
+      const existing = await prisma.companyProfile.findUnique({
+        where: { taxId },
+        include: { businessItems: { orderBy: { seqNo: 'asc' } } },
+      });
+      // 已經有資料就跳過，不打 GCIS——這條路刻意不檢查 stockCode 是否跟既有資料一致，帶 force=true
+      // 才會真的重新抓取並覆寫（包含 stockCode）。
+      if (existing) return { success: true, profile: existing, skipped: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   let records;

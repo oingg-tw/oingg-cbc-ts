@@ -15,8 +15,9 @@ const router = Router();
  *       存進 company_profiles / company_business_items。單一統編若已有資料，預設直接跳過、不打
  *       GCIS；帶 force=true 才會整批都重新抓取並覆寫（含 stockCode、營業項目整批刪除重建）。對
  *       GCIS 的請求本身有節流，同一 process 內每次呼叫至少間隔 1 秒，避免短時間連續打被暫時鎖——
- *       這也是逐筆序列處理而非平行處理的原因之一。單筆失敗（GCIS 查無資料、stockCode 衝突等）
- *       不會中斷整批，會照實記錄在該筆的 result 裡。
+ *       這也是逐筆序列處理而非平行處理的原因之一。對 GCIS 的請求失敗（連不上、非 200）會自動重試
+ *       最多 2 次（間隔遞增 2s/4s）；「查無此統編」不算失敗，不會重試。單筆處理失敗（重試後仍失敗、
+ *       stockCode 衝突等）不會中斷整批，會照實記錄在該筆的 result 裡，繼續處理下一筆。
  *     tags:
  *       - Ingestion
  *     requestBody:
