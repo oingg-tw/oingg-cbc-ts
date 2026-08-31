@@ -5,6 +5,7 @@ import {
   getCompanyProfileByTaxId,
   getCompanyProfileByStockCode,
   listCompanyProfileIngestionFailures,
+  listRegisteredStockCodes,
 } from './service';
 import type { CompanyProfileWithBusinessItems } from './types';
 
@@ -122,6 +123,16 @@ export const listCompanyProfileIngestionFailuresController = async (_req: Reques
     res.status(200).json(failures);
   } catch (error) {
     console.error('Company profile ingestion failures query failed:', error);
+    next(error);
+  }
+};
+
+export const listRegisteredStockCodesController = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const stockCodes = await listRegisteredStockCodes();
+    res.status(200).json(stockCodes);
+  } catch (error) {
+    console.error('Registered stock codes query failed:', error);
     next(error);
   }
 };

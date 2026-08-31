@@ -3,6 +3,7 @@ import {
   getCompanyProfileByTaxIdController,
   getCompanyProfileByStockCodeController,
   listCompanyProfileIngestionFailuresController,
+  listRegisteredStockCodesController,
 } from './controller';
 
 const router = Router();
@@ -54,6 +55,25 @@ router.get('/company-profile/tax-id/:taxId', getCompanyProfileByTaxIdController)
  *         description: 尚未登記過此證券代碼。
  */
 router.get('/company-profile/stock-code/:stockCode', getCompanyProfileByStockCodeController);
+
+/**
+ * @swagger
+ * /api/query/company-profile/stock-codes:
+ *   get:
+ *     summary: 列出目前已經有營業項目資料的證券代碼（供 TWSE 等外部系統查詢清單）
+ *     description: >
+ *       回傳目前所有已成功登記（POST /api/ingest/company-profile）的證券代碼清單，每筆只帶
+ *       stockCode/taxId/營業項目筆數/最後更新時間，不含完整營業項目內容——只是要知道「這裡有沒有
+ *       這支股票的資料」的話用這支即可，需要細節再用 stock-code/{stockCode} 個別查。company_profiles
+ *       有資料就代表營業項目一定有（兩者同一個 transaction 一起寫入），不會有「主檔存在但項目是空的」
+ *       的情況。按證券代碼排序。
+ *     tags:
+ *       - Query
+ *     responses:
+ *       200:
+ *         description: 已登記的證券代碼清單。
+ */
+router.get('/company-profile/stock-codes', listRegisteredStockCodesController);
 
 /**
  * @swagger

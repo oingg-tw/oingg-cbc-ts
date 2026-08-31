@@ -118,17 +118,36 @@ const registerCompanyProfileCore = async (stockCode: string, taxId: string, forc
 export const getCompanyProfileByTaxId = (taxId: string): Promise<CompanyProfileWithBusinessItems | null> => {
   return prisma.companyProfile.findUnique({
     where: { taxId },
-    include: { businessItems: { orderBy: { seqNo: 'asc' } } },
+    include: { businessItems: { orderBy: { position: 'asc' } } },
   });
 };
 
 export const getCompanyProfileByStockCode = (stockCode: string): Promise<CompanyProfileWithBusinessItems | null> => {
   return prisma.companyProfile.findUnique({
     where: { stockCode },
-    include: { businessItems: { orderBy: { seqNo: 'asc' } } },
+    include: { businessItems: { orderBy: { position: 'asc' } } },
   });
 };
 
 export const listCompanyProfileIngestionFailures = (): Promise<CompanyProfileIngestionFailure[]> => {
   return prisma.companyProfileIngestionFailure.findMany({ orderBy: { updatedAt: 'desc' } });
+};
+
+export interface RegisteredStockCode {
+  stockCode: string;
+  taxId: string;
+  businessItemCount: number;
+  updatedAt: Date;
+}
+
+// 給 TWSE（或其他外部系統）打的清單端點：只回傳「有哪些證券代碼已經有營業項目」，不含完整營業項目
+// 內容——要看細節請用 GET /api/query/company-profile/stock-code/:stockCode 個別查。company_profiles
+// 裡有資料就代表 businessItems 一定有（兩者是同一個 $transaction 一起寫入的，見 registerCompanyProfile），
+// 所以不用另外檢查 businessItems 是否為空。
+export const listRegisteredStockCodes = async (): Promise<RegisteredStockCode[]> => {
+  const profiles = await prisma.companyProfile.findMany({
+    select: { stockCode: true, taxId: true, updatedAt: true, _count: { select: { businessItems: true } } },
+    orderBy: { stockCode: 'asc' },
+  });
+  return profiles.map((p) => ({ stockCode: p.stockCode, taxId: p.taxId, businessItemCount: p._count.businessItems, updatedAt: p.updatedAt }));
 };
