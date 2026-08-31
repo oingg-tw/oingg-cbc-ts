@@ -14,8 +14,8 @@ added one at a time, from whichever agency has the data.
 ## The CBC API
 
 CBC's Statistical Database API is the first and so far primary data source.
-Other agencies may need their own client under `src/shared/` (see
-`cbcClient.ts` for the pattern) if their API shape differs.
+Other agencies get their own adapter under `src/adapters/` (see
+`adapters/cbc/index.ts` for the pattern) since their API shape differs.
 
 ```
 GET https://cpx.cbc.gov.tw/API/DataAPI/Get?FileName={ItemCode}
@@ -40,27 +40,29 @@ Same domain-driven layout as oingg-mops-ts:
 ```
 src/
   index.ts              # app bootstrap (middleware, routes, error handler, server start)
-  routes.ts             # mounts each domain's router under /api/ingest
+  routes.ts             # mounts ingest domains under /api/ingest, query domains under /api/query
   adapters/
     prisma/              # single shared PrismaClient instance
     swagger/              # swagger-jsdoc setup, reads @swagger comments from domains/**
+    cbc/                  # fetchCbcItem(itemCode) — the one place that talks to the CBC API
+    gcis/                 # fetchCompanyBusinessItems(no) — the one place that talks to the GCIS API
+    <agency>/              # one folder per external data source, added as needed
   shared/
     config.ts            # env-derived config
     errorHandler.ts       # last-resort express error handler
     serverInfo.ts         # startup timing, exposed on GET /
-    cbcClient.ts          # fetchCbcItem(itemCode) — the one place that talks to the CBC API
-                           # (add a sibling client here for other agencies as needed)
   domains/
     system/root.ts        # health check (GET /)
     <domain>/              # one folder per data category, added as needed:
       route.ts              #   Express router + @swagger docs
       controller.ts          #   HTTP layer: parse request, call service, shape response
       service.ts              #   orchestrates: check DB → fetch from source → parse → persist
-      parser.ts                #   raw source data -> typed rows
+                               #   (query-type domains skip the DB/persist step, see companyBusinessItems)
+      parser.ts                #   raw source data -> typed rows (ingest-type domains only)
       ingest.ts (optional)      #   DB upsert logic, if it's more than a one-liner in service.ts
       types.ts                  #   domain-specific types
 prisma/
-  schema.prisma          # no models yet — see the comment block in the file for how to add one
+  schema.prisma          # models for ingested/reference data — see the comment block in each model
 ```
 
 ## Adding a new domain
@@ -72,8 +74,8 @@ agency has the data you need.
    [CBC-ITEM-CODES.md](./CBC-ITEM-CODES.md). For another agency, find its API
    (or other structured export) and fetch a real response before writing
    anything — don't guess the schema from docs or the item name alone.
-2. If the source isn't CBC, add a client for it under `src/shared/`
-   following the pattern in `cbcClient.ts`.
+2. If the source isn't CBC, add an adapter for it under `src/adapters/`
+   following the pattern in `adapters/cbc/index.ts` or `adapters/gcis/index.ts`.
 3. Add a `src/domains/<domain>/` folder following the layout above.
 4. Add a Prisma model in `prisma/schema.prisma` (field naming / `@map`
    conventions should match oingg-mops-ts's schema) and run

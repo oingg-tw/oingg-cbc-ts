@@ -1,4 +1,4 @@
-import type { CbcApiResponse } from '../../shared/cbcClient';
+import type { CbcApiResponse } from '../../adapters/cbc';
 import type { MonthlyGovBondYield10yPoint } from './types';
 
 // 目標欄位在 data.structure 裡的顯示名稱（已用真實回應核對過，2026-08-28）。用名稱比對找欄位索引，

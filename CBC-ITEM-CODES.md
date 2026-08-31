@@ -21,7 +21,7 @@ The response is JSON with three parts:
 3. **structure** — dimensional/column info for the dataset.
 
 The exact shape of each part is not documented and appears to vary by item —
-fetch a real item with `src/shared/cbcClient.ts`'s `fetchCbcItem(itemCode)`
+fetch a real item with `src/adapters/cbc/index.ts`'s `fetchCbcItem(itemCode)`
 and inspect the real response before writing a parser (paste real JSON →
 diff/fix, same workflow as oingg-mops-ts).
 

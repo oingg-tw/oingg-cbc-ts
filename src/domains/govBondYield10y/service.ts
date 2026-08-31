@@ -1,5 +1,5 @@
 import prisma from '../../adapters/prisma/index';
-import { fetchCbcItem } from '../../shared/cbcClient';
+import { fetchCbcItem } from '../../adapters/cbc';
 import { parseMonthlyGovBondYield10y } from './parser';
 
 const ITEM_CODE = 'EG43M01en';
