@@ -21,7 +21,22 @@ export interface GcisCompanyRecord {
   Cmp_Business: GcisCompanyBusinessItem[];
 }
 
+// 節流：GCIS 沒公開速率限制文件，但短時間內連續打有被暫時鎖 IP 的風險，保守起見同一個 process 內
+// 每次呼叫之間至少間隔 MIN_REQUEST_INTERVAL_MS，用模組層級變數記上一次請求時間，而不是每個呼叫端
+// 自己各自 sleep——這樣不管是 companyBusinessItems 的即時查詢還是 companyProfile 的註冊流程，
+// 只要共用這個 client 就都受節流保護，不用每個 domain 各自實作一次。
+const MIN_REQUEST_INTERVAL_MS = 1000;
+let lastRequestAt = 0;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const fetchCompanyBusinessItems = async (businessAccountingNo: string): Promise<GcisCompanyRecord[]> => {
+  const elapsed = Date.now() - lastRequestAt;
+  if (elapsed < MIN_REQUEST_INTERVAL_MS) {
+    await sleep(MIN_REQUEST_INTERVAL_MS - elapsed);
+  }
+  lastRequestAt = Date.now();
+
   const filter = `Business_Accounting_NO eq '${businessAccountingNo}'`;
   const url = `${GCIS_COMPANY_BUSINESS_API_URL}?${new URLSearchParams({ $format: 'json', $filter: filter }).toString()}`;
   const response = await fetch(url);

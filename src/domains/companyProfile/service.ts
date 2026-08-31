@@ -3,7 +3,17 @@ import prisma from '../../adapters/prisma/index';
 import { fetchCompanyBusinessItems } from '../../adapters/gcis';
 import type { RegisterCompanyProfileResult, CompanyProfileWithBusinessItems } from './types';
 
-export const registerCompanyProfile = async (stockCode: string, taxId: string): Promise<RegisterCompanyProfileResult> => {
+export const registerCompanyProfile = async (stockCode: string, taxId: string, force = false): Promise<RegisterCompanyProfileResult> => {
+  if (!force) {
+    const existing = await prisma.companyProfile.findUnique({
+      where: { taxId },
+      include: { businessItems: { orderBy: { seqNo: 'asc' } } },
+    });
+    // 已經有資料就跳過，不打 GCIS——這條路刻意不檢查 stockCode 是否跟既有資料一致，帶 force=true
+    // 才會真的重新抓取並覆寫（包含 stockCode）。
+    if (existing) return { success: true, profile: existing, skipped: true };
+  }
+
   let records;
   try {
     records = await fetchCompanyBusinessItems(taxId);

@@ -5,6 +5,7 @@ import { registerCompanyProfile, getCompanyProfileByTaxId, getCompanyProfileBySt
 const registerBodySchema = z.object({
   stockCode: z.string().regex(/^[0-9A-Z]{4,6}$/, '證券代碼須為 4-6 碼英數字'),
   taxId: z.string().regex(/^\d{8}$/, '統一編號須為 8 碼數字'),
+  force: z.boolean().optional().default(false), // true 時即使已有資料也重新向 GCIS 抓取並覆寫
 });
 
 export const registerCompanyProfileController = async (req: Request, res: Response, next: NextFunction) => {
@@ -17,8 +18,8 @@ export const registerCompanyProfileController = async (req: Request, res: Respon
       });
     }
 
-    const { stockCode, taxId } = validationResult.data;
-    const result = await registerCompanyProfile(stockCode, taxId);
+    const { stockCode, taxId, force } = validationResult.data;
+    const result = await registerCompanyProfile(stockCode, taxId, force);
 
     if (!result.success) {
       if (result.notFound) {
@@ -30,7 +31,13 @@ export const registerCompanyProfileController = async (req: Request, res: Respon
       });
     }
 
-    res.status(200).json(result.profile);
+    res.status(200).json({
+      message: result.skipped
+        ? `taxId=${taxId} 已有資料，已跳過（帶 force=true 可強制重新抓取）。`
+        : `taxId=${taxId} 登記完成。`,
+      skipped: result.skipped ?? false,
+      profile: result.profile,
+    });
   } catch (error) {
     console.error('Company profile registration failed:', error);
     next(error);
