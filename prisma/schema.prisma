@@ -1,11 +1,13 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  schemas   = ["public", "export"]
 }
 
 /// 10年期政府公債次級市場殖利率月資料，由 /api/ingest/gov-bond-yield-10y 觸發向央行統計資料庫 API
@@ -27,6 +29,7 @@ model MonthlyGovBondYield10y {
 
   @@id([year, month])
   @@map("monthly_gov_bond_yield_10y")
+  @@schema("public")
 }
 
 /// 財政部統計處《中華民國稅務行業標準分類（第9次修訂）》代碼字典，一列對應五層階層（大/中/小/細/
@@ -63,6 +66,7 @@ model TaxIndustryClassification {
   @@index([groupCode])
   @@index([classCode])
   @@map("tax_industry_classification")
+  @@schema("public")
 }
 
 /// 公司主檔，由外部呼叫 POST /api/ingest/company-profile 帶入「證券代碼＋統編」登記時建立/更新。
@@ -86,6 +90,7 @@ model CompanyProfile {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("company_profiles")
+  @@schema("public")
 }
 
 /// CompanyProfile 底下的營業項目快照，來源是登記當下 GCIS 回應的 Cmp_Business 陣列。GCIS 每次回應
@@ -114,6 +119,7 @@ model CompanyBusinessItem {
   @@unique([taxId, position])
   @@index([itemCode])
   @@map("company_business_items")
+  @@schema("public")
 }
 
 /// 記錄 registerCompanyProfile（POST /api/ingest/company-profile）失敗的統編，一個統編一列（用
@@ -132,4 +138,26 @@ model CompanyProfileIngestionFailure {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") // 最後一次失敗的時間
 
   @@map("company_profile_ingestion_failures")
+  @@schema("public")
+}
+
+/// analysis-ts「數據中台」export 契約層的一部分（2026-08-31 應 analysis-ts 要求新增）。這不是內部
+/// 使用的表——export schema 只授權 SELECT 給一個專用的唯讀 role（etl_reader），analysis-ts 靠這張
+/// 表判斷某個 dataset 的某批資料是否「可信、已完成」：他們只認 status = 'success' 的紀錄，raw 表
+/// 裡就算已經有資料，沒有對應的 success 紀錄也當作不存在。
+///
+/// 顆粒度是「一次 ingest 呼叫」，不是逐月——CBC 的 EG43M01en 端點本身一次就回傳 1987-M5 至今整段
+/// 月資料，沒有自然的逐月分批單位（見 MonthlyGovBondYield10y 的註解）。dataDate 記這批資料實際涵蓋
+/// 到的最新月份（不是「今天」，是資料本身的最新業務日期），讓 analysis-ts 知道資料新鮮到哪個月。
+model IngestionRun {
+  runId       BigInt   @id @default(autoincrement()) @map("run_id")
+  dataset     String // 對應 export schema 裡的哪個 view，例如 "monthly_gov_bond_yield_10y"
+  dataDate    DateTime @db.Date @map("data_date") // 這批資料涵蓋到的最新業務日期（不是 ingest 執行的時間）
+  completedAt DateTime @default(now()) @map("completed_at")
+  rowCount    Int      @map("row_count")
+  status      String // success | partial | failed
+
+  @@index([dataset, status])
+  @@map("ingestion_runs")
+  @@schema("export")
 }
