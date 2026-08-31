@@ -1,9 +1,36 @@
 import { Prisma } from '@prisma/client';
+import type { CompanyProfileIngestionFailure } from '@prisma/client';
 import prisma from '../../adapters/prisma/index';
 import { fetchCompanyBusinessItems } from '../../adapters/gcis';
 import type { RegisterCompanyProfileResult, CompanyProfileWithBusinessItems } from './types';
 
+// company_profile_ingestion_failures 只記「目前還沒成功過的統編」：失敗就 upsert（累加 attempts、
+// 更新錯誤訊息），成功（不論新登記還是 skip 既有資料）就把該統編的紀錄刪掉。這裡包 try/catch 是
+// 因為這是輔助性的記帳動作，記錄本身失敗（例如 DB 瞬斷）不該讓 registerCompanyProfile 原本已經
+// 拿到的成功/失敗結果被蓋掉——最多印錯誤、結果照樣回傳。
+const recordIngestionOutcome = async (stockCode: string, taxId: string, result: RegisterCompanyProfileResult): Promise<void> => {
+  try {
+    if (result.success) {
+      await prisma.companyProfileIngestionFailure.deleteMany({ where: { taxId } });
+    } else {
+      await prisma.companyProfileIngestionFailure.upsert({
+        where: { taxId },
+        create: { taxId, stockCode, error: result.error ?? 'Unknown error' },
+        update: { stockCode, error: result.error ?? 'Unknown error', attempts: { increment: 1 } },
+      });
+    }
+  } catch (error) {
+    console.error('Failed to record company profile ingestion outcome:', error);
+  }
+};
+
 export const registerCompanyProfile = async (stockCode: string, taxId: string, force = false): Promise<RegisterCompanyProfileResult> => {
+  const result = await registerCompanyProfileCore(stockCode, taxId, force);
+  await recordIngestionOutcome(stockCode, taxId, result);
+  return result;
+};
+
+const registerCompanyProfileCore = async (stockCode: string, taxId: string, force: boolean): Promise<RegisterCompanyProfileResult> => {
   if (!force) {
     // 包 try/catch 是因為這個 function 會在批次 ingest 的迴圈裡被逐筆呼叫（見
     // companyProfile/controller.ts）：這裡如果不接住例外直接往外丟，會讓單一統編的 DB 查詢失敗
@@ -93,4 +120,8 @@ export const getCompanyProfileByStockCode = (stockCode: string): Promise<Company
     where: { stockCode },
     include: { businessItems: { orderBy: { seqNo: 'asc' } } },
   });
+};
+
+export const listCompanyProfileIngestionFailures = (): Promise<CompanyProfileIngestionFailure[]> => {
+  return prisma.companyProfileIngestionFailure.findMany({ orderBy: { updatedAt: 'desc' } });
 };

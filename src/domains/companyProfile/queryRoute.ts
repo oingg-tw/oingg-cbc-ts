@@ -1,5 +1,9 @@
 import { Router } from 'ultimate-express';
-import { getCompanyProfileByTaxIdController, getCompanyProfileByStockCodeController } from './controller';
+import {
+  getCompanyProfileByTaxIdController,
+  getCompanyProfileByStockCodeController,
+  listCompanyProfileIngestionFailuresController,
+} from './controller';
 
 const router = Router();
 
@@ -50,5 +54,23 @@ router.get('/company-profile/tax-id/:taxId', getCompanyProfileByTaxIdController)
  *         description: 尚未登記過此證券代碼。
  */
 router.get('/company-profile/stock-code/:stockCode', getCompanyProfileByStockCodeController);
+
+/**
+ * @swagger
+ * /api/query/company-profile/failures:
+ *   get:
+ *     summary: 列出目前尚未成功登記的統編
+ *     description: >
+ *       讀取 company_profile_ingestion_failures：每個統編一列，代表這個統編從沒成功登記過（不論是
+ *       GCIS 抓取失敗、查無此統編、還是 stockCode 衝突），含最後一次的錯誤訊息與累積失敗次數。
+ *       一旦該統編成功登記，這裡的紀錄就會被清掉——所以這張表反映的是「現在」還卡住的，不是完整
+ *       歷史紀錄。按最後失敗時間新到舊排序。
+ *     tags:
+ *       - Query
+ *     responses:
+ *       200:
+ *         description: 目前尚未成功登記的統編清單。
+ */
+router.get('/company-profile/failures', listCompanyProfileIngestionFailuresController);
 
 export default router;

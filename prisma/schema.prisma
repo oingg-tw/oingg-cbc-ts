@@ -107,3 +107,21 @@ model CompanyBusinessItem {
   @@index([itemCode])
   @@map("company_business_items")
 }
+
+/// 記錄 registerCompanyProfile（POST /api/ingest/company-profile）失敗的統編，一個統編一列（用
+/// taxId 當主鍵 upsert，不是每次失敗都新增一列）——目的是回答「目前還有哪些統編沒成功登記」，不是
+/// 完整的歷史稽核軌跡，所以重複失敗只累加 attempts、更新 error/updatedAt，不留舊的錯誤訊息。之後
+/// 只要該統編成功登記（不論是新登記還是 force 覆寫），這一列就會被刪除——這張表裡有資料，就代表
+/// 「這個統編從沒成功過」。
+model CompanyProfileIngestionFailure {
+  taxId     String @id @map("tax_id") // 統一編號
+  stockCode String @map("stock_code") // 最後一次嘗試時帶的證券代碼
+
+  error    String @db.Text // 最後一次失敗的錯誤訊息
+  attempts Int    @default(1) // 累積失敗次數
+
+  createdAt DateTime @default(now()) @map("created_at") // 第一次失敗的時間
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") // 最後一次失敗的時間
+
+  @@map("company_profile_ingestion_failures")
+}

@@ -1,6 +1,11 @@
 import { type Request, type Response, type NextFunction } from 'ultimate-express';
 import { z } from 'zod';
-import { registerCompanyProfile, getCompanyProfileByTaxId, getCompanyProfileByStockCode } from './service';
+import {
+  registerCompanyProfile,
+  getCompanyProfileByTaxId,
+  getCompanyProfileByStockCode,
+  listCompanyProfileIngestionFailures,
+} from './service';
 import type { CompanyProfileWithBusinessItems } from './types';
 
 const registerItemSchema = z.object({
@@ -107,6 +112,16 @@ export const getCompanyProfileByStockCodeController = async (req: Request, res: 
     res.status(200).json(profile);
   } catch (error) {
     console.error('Company profile lookup by stockCode failed:', error);
+    next(error);
+  }
+};
+
+export const listCompanyProfileIngestionFailuresController = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const failures = await listCompanyProfileIngestionFailures();
+    res.status(200).json(failures);
+  } catch (error) {
+    console.error('Company profile ingestion failures query failed:', error);
     next(error);
   }
 };
