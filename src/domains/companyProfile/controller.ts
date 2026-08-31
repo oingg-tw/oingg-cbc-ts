@@ -1,11 +1,18 @@
 import { type Request, type Response, type NextFunction } from 'ultimate-express';
 import { z } from 'zod';
 import { registerCompanyProfile, getCompanyProfileByTaxId, getCompanyProfileByStockCode } from './service';
+import type { CompanyProfileWithBusinessItems } from './types';
 
-const registerBodySchema = z.object({
+const registerItemSchema = z.object({
   stockCode: z.string().regex(/^[0-9A-Z]{4,6}$/, '證券代碼須為 4-6 碼英數字'),
   taxId: z.string().regex(/^\d{8}$/, '統一編號須為 8 碼數字'),
-  force: z.boolean().optional().default(false), // true 時即使已有資料也重新向 GCIS 抓取並覆寫
+});
+
+const registerBodySchema = z.object({
+  // 上限 200 筆：GCIS client 有節流（同一 process 內每次呼叫至少間隔 1 秒），一次收太多筆會讓單一
+  // HTTP 請求跑很久，容易撞到呼叫端或反向代理的逾時，寧可讓呼叫端自己分批送。
+  items: z.array(registerItemSchema).min(1, '至少要有一筆').max(200, '一次最多 200 筆，請分批送'),
+  force: z.boolean().optional().default(false), // true 時整批都即使已有資料也重新向 GCIS 抓取並覆寫
 });
 
 export const registerCompanyProfileController = async (req: Request, res: Response, next: NextFunction) => {
@@ -18,25 +25,43 @@ export const registerCompanyProfileController = async (req: Request, res: Respon
       });
     }
 
-    const { stockCode, taxId, force } = validationResult.data;
-    const result = await registerCompanyProfile(stockCode, taxId, force);
+    const { items, force } = validationResult.data;
 
-    if (!result.success) {
-      if (result.notFound) {
-        return res.status(404).json({ message: result.error });
-      }
-      return res.status(502).json({
-        message: 'Failed to register company profile.',
+    // 外部一次把整個陣列送進來，但進到 gov 之後還是一筆一筆序列處理（不是 Promise.all 平行打）——
+    // 一來 GCIS client 本身有節流會把平行請求擠成序列，平行送只會讓每個請求各自排隊等節流，沒有
+    // 加速效果；二來序列處理讓單一統編查詢失敗時不會影響其他筆，也方便逐筆記錄成功/跳過/失敗。
+    const results: Array<{
+      stockCode: string;
+      taxId: string;
+      success: boolean;
+      skipped: boolean;
+      error?: string;
+      profile?: CompanyProfileWithBusinessItems;
+    }> = [];
+
+    for (const { stockCode, taxId } of items) {
+      const result = await registerCompanyProfile(stockCode, taxId, force);
+      results.push({
+        stockCode,
+        taxId,
+        success: result.success,
+        skipped: result.skipped ?? false,
         error: result.error,
+        profile: result.profile,
       });
     }
 
+    const succeeded = results.filter((r) => r.success && !r.skipped).length;
+    const skipped = results.filter((r) => r.skipped).length;
+    const failed = results.filter((r) => !r.success).length;
+
     res.status(200).json({
-      message: result.skipped
-        ? `taxId=${taxId} 已有資料，已跳過（帶 force=true 可強制重新抓取）。`
-        : `taxId=${taxId} 登記完成。`,
-      skipped: result.skipped ?? false,
-      profile: result.profile,
+      message: `共 ${results.length} 筆：${succeeded} 筆登記/更新、${skipped} 筆跳過、${failed} 筆失敗。`,
+      total: results.length,
+      succeeded,
+      skipped,
+      failed,
+      results,
     });
   } catch (error) {
     console.error('Company profile registration failed:', error);
