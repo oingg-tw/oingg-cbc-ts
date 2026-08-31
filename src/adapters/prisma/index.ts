@@ -3,8 +3,8 @@ import { config } from '../../shared/config';
 
 // Instantiate a single PrismaClient instance to be used across the application.
 export const prisma = new PrismaClient({
-  // Log database queries in development for easier debugging.
-  log: config.isProduction ? ['error'] : ['query', 'info', 'warn', 'error'],
+  // 'query' 開下去在批次 ingest（例如一次幾百筆 company-profile）時會洗版，開發環境只留 warn/error。
+  log: config.isProduction ? ['error'] : ['warn', 'error'],
 });
 
 export const connectDb = async () => {
