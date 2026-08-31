@@ -82,11 +82,24 @@ const registerCompanyProfileCore = async (stockCode: string, taxId: string, forc
       });
 
       // GCIS 回應是「當下完整清單」而非增量，整批刪除重建比逐筆比對更新簡單也更不容易留下髒資料。
+      //
+      // 實測發現（雲豹能源科技 42852207 等）：不少公司的回應裡，每一筆營業項目會原封不動出現兩次
+      // ——不是序號剛好撞在一起，是 seqNo/itemCode/itemDesc 三個欄位完全一樣的整列重複。這是 GCIS
+      // 自己回應內容的問題，不是我們解析錯；直接照登會讓同一個項目在 DB 裡出現兩次。用
+      // seqNo+itemCode+itemDesc 三個欄位的組合去重，只保留第一次出現的那筆。
+      const seenKeys = new Set<string>();
+      const dedupedItems = record.Cmp_Business.filter((item) => {
+        const key = `${item.Business_Seq_NO}|${item.Business_Item}|${item.Business_Item_Desc}`;
+        if (seenKeys.has(key)) return false;
+        seenKeys.add(key);
+        return true;
+      });
+
       await tx.companyBusinessItem.deleteMany({ where: { taxId } });
       await tx.companyBusinessItem.createMany({
-        data: record.Cmp_Business.map((item, position) => ({
+        data: dedupedItems.map((item, position) => ({
           taxId,
-          position, // 陣列索引，不是 Business_Seq_NO——後者實測會在同一份回應裡重複，見 schema.prisma 註解
+          position, // 陣列索引（去重後），不是 Business_Seq_NO——後者實測會重複，見 schema.prisma 註解
           seqNo: item.Business_Seq_NO,
           itemCode: item.Business_Item.trim() === '' ? null : item.Business_Item,
           itemDesc: item.Business_Item_Desc,
