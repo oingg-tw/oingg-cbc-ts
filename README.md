@@ -80,14 +80,20 @@ agency has the data you need.
 4. Add a Prisma model in `prisma/schema.prisma` (field naming / `@map`
    conventions should match oingg-mops-ts's schema) and run
    `pnpm prisma migrate dev --name <description>`.
-5. Wire the domain's router into `src/routes.ts`.
+5. Wire the domain's router into `src/routes.ts`. Ingest-type domains
+   mounted under `ingestRouter` automatically get `TASK_SECRET` +
+   rate-limit protection (applied once at the router level) — no per-route
+   setup needed. Query-type domains under `queryRouter` are unprotected by
+   default; add protection explicitly if a specific query route turns out
+   to need it.
 
 ## Setup
 
 ```
 pnpm install
-cp .env.example .env   # fill in DATABASE_URL / DIRECT_URL
+cp .env.example .env   # fill in DATABASE_URL / DIRECT_URL / TASK_SECRET
 pnpm dev                # tsx watch src/index.ts
+pnpm test                # vitest run — src/tests/
 ```
 
 `pnpm dev` starts the API on `PORT` (default 8084) — part of the ecosystem's
@@ -95,3 +101,9 @@ shared port allocation maintained in oingg-conductor-ts's
 [`docs/conventions.md`](../oingg-conductor-ts/docs/conventions.md), so it
 doesn't collide with the other services when running side by side. Swagger
 docs are served at `/api-docs`.
+
+All `/api/ingest/*` routes require a `TASK_SECRET` (via the `X-Task-Secret`
+header or `task_secret` query param) and are rate-limited to one trigger per
+dataset per 60s — see `src/shared/middleware.ts` / `src/shared/rateLimiter.ts`.
+Query routes under `/api/query/*` are unprotected (read-only, not
+externally-triggered fetches).

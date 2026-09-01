@@ -17,9 +17,9 @@ const options: swaggerJSDoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'OINGG CBC API',
+      title: 'OINGG Gov API',
       version: '1.0.0',
-      description: 'API documentation for the OINGG CBC ingestion service',
+      description: 'API documentation for the OINGG Taiwan government open data ingestion service',
     },
     servers: [
       {
@@ -27,6 +27,15 @@ const options: swaggerJSDoc.Options = {
         description: 'Development server',
       },
     ],
+    components: {
+      securitySchemes: {
+        TaskSecret: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'X-Task-Secret',
+        },
+      },
+    },
   },
   // Path to the API docs. It's crucial to use absolute paths created with `join`.
   apis: [

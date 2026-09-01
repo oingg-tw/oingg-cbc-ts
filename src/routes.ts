@@ -6,10 +6,17 @@ import taxIndustryClassificationRouter from './domains/taxIndustryClassification
 import companyProfileIngestRouter from './domains/companyProfile/ingestRoute';
 import companyProfileQueryRouter from './domains/companyProfile/queryRoute';
 import companyIndustryClassificationRouter from './domains/companyIndustryClassification/route';
+import { requireTaskSecret } from './shared/middleware';
+import { ingestRateLimit } from './shared/rateLimiter';
 // 每新增一個 domain（例如 exchangeRate、interestRate），在這裡 import 其 route.ts。
 // 會寫入資料庫的 ingest 型 domain 掛進 ingestRouter（/api/ingest）；單純即時查詢、不落地的
 // query 型 domain（例如 companyBusinessItems、taxIndustryClassification）掛進 queryRouter（/api/query）。
 // 像 companyProfile 這種兩邊都有的 domain，拆成 ingestRoute.ts / queryRoute.ts 兩個檔案分別掛。
+//
+// ingestRouter 整層掛了 requireTaskSecret + ingestRateLimit（跟 oingg-mops-ts 的做法一致：掛在
+// router 層級一次涵蓋全部現有跟未來的 /api/ingest/*，不用每個 route.ts 各自標註）——這幾個端點會
+// 真的去打 GCIS/CBC/財政部（company-industry-classification 甚至會下載 322MB 檔案），沒有保護的
+// 話任何人知道 URL 就能觸發，見 oingg-conductor-ts 的 docs/conventions.md「TASK_SECRET」一節。
 
 const router = Router();
 
@@ -18,6 +25,7 @@ router.use(rootRouter);
 
 // --- API Routes ---
 const ingestRouter = Router();
+ingestRouter.use(requireTaskSecret, ingestRateLimit);
 ingestRouter.use(govBondYield10yRouter);
 ingestRouter.use(companyProfileIngestRouter);
 ingestRouter.use(companyIndustryClassificationRouter);

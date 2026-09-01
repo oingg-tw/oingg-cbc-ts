@@ -20,6 +20,8 @@ const router = Router();
  *       stockCode 衝突等）不會中斷整批，會照實記錄在該筆的 result 裡，繼續處理下一筆。
  *     tags:
  *       - Ingestion
+ *     security:
+ *       - TaskSecret: []
  *     requestBody:
  *       required: true
  *       content:

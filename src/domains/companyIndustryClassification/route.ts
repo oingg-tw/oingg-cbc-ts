@@ -20,6 +20,8 @@ const router = Router();
  *       過兩者對不起來）。
  *     tags:
  *       - Ingestion
+ *     security:
+ *       - TaskSecret: []
  *     responses:
  *       200:
  *         description: 回填完成，回傳追蹤家數、成功比對數、稅籍檔裡找不到的家數、行業代號對不到分類表的家數。

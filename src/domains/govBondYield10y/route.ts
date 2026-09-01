@@ -21,6 +21,8 @@ const router = Router();
  *       理論上不會被事後修正，force 主要用於重跑時強制刷新。
  *     tags:
  *       - Ingestion
+ *     security:
+ *       - TaskSecret: []
  *     requestBody:
  *       required: false
  *       content:
