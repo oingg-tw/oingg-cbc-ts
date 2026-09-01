@@ -4,6 +4,20 @@ import prisma from '../../adapters/prisma/index';
 import { FIA_BUSINESS_TAX_REGISTRY_CSV_URL, parseFiaBusinessTaxRegistryLine } from '../../adapters/fia/client';
 import type { IngestCompanyIndustryClassificationResult } from './types';
 
+const EXPORT_DATASET = 'company_industry_classification'; // 對應 export.company_industry_classification view
+
+// 跟 govBondYield10y 同樣的道理：analysis-ts 只認 export.ingestion_runs 裡 status='success' 的紀錄，
+// 這是輔助性記帳動作，失敗不能讓主要 ingest 結果跟著失敗。
+const recordIngestionRun = async (status: 'success' | 'failed', rowCount: number): Promise<void> => {
+  try {
+    await prisma.ingestionRun.create({
+      data: { dataset: EXPORT_DATASET, dataDate: new Date(), rowCount, status },
+    });
+  } catch (error) {
+    console.error('Failed to record ingestion run for analysis-ts export contract:', error);
+  }
+};
+
 // 財政部原始代碼是 6 碼數字（例如 "233100"），tax_industry_classification 的 subclass 代碼格式是
 // 前4碼-後2碼（例如 "2331-00"）——已用亞洲水泥(統編03244509)實測驗證過這個轉換規則跟真實資料對得起來
 // （"233100" 對到 "2331-00" 水泥製造，符合實際主業）。
@@ -70,6 +84,7 @@ export const ingestCompanyIndustryClassification = async (): Promise<IngestCompa
   try {
     registryMatches = await streamMatchRegistry(targetTaxIds);
   } catch (error) {
+    await recordIngestionRun('failed', 0);
     return {
       success: false,
       targetCount: targetTaxIds.size,
@@ -114,5 +129,6 @@ export const ingestCompanyIndustryClassification = async (): Promise<IngestCompa
 
   const notFoundInRegistry = targetTaxIds.size - registryMatches.size;
 
+  await recordIngestionRun('success', matched);
   return { success: true, targetCount: targetTaxIds.size, matched, notFoundInRegistry, invalidIndustryCode };
 };
