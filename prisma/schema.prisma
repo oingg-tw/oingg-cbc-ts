@@ -1,13 +1,10 @@
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["multiSchema"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-  schemas   = ["public", "export"]
+  provider = "postgresql"
+  schemas  = ["public", "export"]
 }
 
 /// 10年期政府公債次級市場殖利率月資料，由 /api/ingest/gov-bond-yield-10y 觸發向央行統計資料庫 API

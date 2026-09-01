@@ -1,6 +1,8 @@
+import 'dotenv/config'; // 獨立腳本執行（tsx prisma/seed.ts），不會經過 src/index.ts 的開機流程，
+// 要自己先載入 .env，adapters/prisma/index.ts 在 import 當下就會讀 process.env.DATABASE_URL。
 import fs from 'node:fs';
 import path from 'node:path';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../src/adapters/prisma/index';
 
 // 一次性 seed script：把財政部《中華民國稅務行業標準分類（第9次修訂）》的完整代碼字典（19大類/
 // 88中類/249小類/522細類/1587子類，共 2,466 列——文件自己標的 1587 子類跟實際資料差 1，比對過
@@ -14,8 +16,6 @@ import { PrismaClient } from '@prisma/client';
 //
 // 只在初次建表或官方改版重新發布時執行一次：
 //   pnpm tsx prisma/seed.ts
-
-const prisma = new PrismaClient();
 
 type SeedRow = {
   code: string;
