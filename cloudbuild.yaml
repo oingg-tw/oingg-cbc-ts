@@ -60,3 +60,9 @@ steps:
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/app:$SHORT_SHA
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/app:latest
+
+# trigger 用自建 service account 時，Cloud Build 要求要嘛指定 logs_bucket，要嘛用這個選項把 log
+# 直接送進 Cloud Logging（不落地 GCS 暫存桶）——手動 gcloud builds submit 沒這個限制，一路走到
+# 建 GitHub trigger 這步才會擋（見 oingg-conductor-ts/docs/production-deployment.md）。
+options:
+  logging: CLOUD_LOGGING_ONLY
