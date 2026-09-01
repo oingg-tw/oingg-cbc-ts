@@ -58,6 +58,8 @@ model TaxIndustryClassification {
 
   priorRevisionCode String? @map("prior_revision_code") // 對照第8次修訂分類編號，用於串接歷史資料
 
+  companies CompanyIndustryClassification[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -84,7 +86,8 @@ model CompanyProfile {
   companyStatusDesc String @map("company_status_desc")
   companySetupDate  String @map("company_setup_date")
 
-  businessItems CompanyBusinessItem[]
+  businessItems          CompanyBusinessItem[]
+  industryClassification CompanyIndustryClassification?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -111,8 +114,8 @@ model CompanyBusinessItem {
   taxId   String         @map("tax_id")
   company CompanyProfile @relation(fields: [taxId], references: [taxId], onDelete: Cascade)
 
-  position Int    @map("position") // 該筆在 GCIS 回應 Cmp_Business 陣列裡的 0-based 索引，用來排序也用來保證唯一
-  seqNo    String @map("seq_no") // Business_Seq_NO，GCIS 原始值，僅供參考（不保證唯一，見上方註解）
+  position Int     @map("position") // 該筆在 GCIS 回應 Cmp_Business 陣列裡的 0-based 索引，用來排序也用來保證唯一
+  seqNo    String  @map("seq_no") // Business_Seq_NO，GCIS 原始值，僅供參考（不保證唯一，見上方註解）
   itemCode String? @map("item_code") // Business_Item，空白視為 null
   itemDesc String  @map("item_desc") // Business_Item_Desc
 
@@ -152,7 +155,7 @@ model CompanyProfileIngestionFailure {
 model IngestionRun {
   runId       BigInt   @id @default(autoincrement()) @map("run_id")
   dataset     String // 對應 export schema 裡的哪個 view，例如 "monthly_gov_bond_yield_10y"
-  dataDate    DateTime @db.Date @map("data_date") // 這批資料涵蓋到的最新業務日期（不是 ingest 執行的時間）
+  dataDate    DateTime @map("data_date") @db.Date // 這批資料涵蓋到的最新業務日期（不是 ingest 執行的時間）
   completedAt DateTime @default(now()) @map("completed_at")
   rowCount    Int      @map("row_count")
   status      String // success | partial | failed
@@ -160,4 +163,34 @@ model IngestionRun {
   @@index([dataset, status])
   @@map("ingestion_runs")
   @@schema("export")
+}
+
+/// 每家公司(用 CompanyProfile.taxId)對應「一個」官方行業分類代碼，來源是財政部財政資訊中心《全國
+/// 營業(稅籍)登記資料集》(data.gov.tw/dataset/9400，每日更新、約171萬列全國登記營業人，沒有查詢式
+/// API，只能整份下載再過濾)——不是拿 CompanyBusinessItem(GCIS 營業項目)反推，那是完全不同的代碼
+/// 系統且一家公司常十幾筆、雜訊很大(2026-08-31 已用亞洲水泥 1102 實測驗證過對不起來)。
+///
+/// 這份稅籍登記資料裡，同一個統編會有多列(總公司+各分公司/廠各自的稅籍登記)，用「統一編號=自己、
+/// 總機構統一編號=空白」那一列鎖定總公司本身的登記資料，取其主要行業代號(欄位裡最多4個，只取第1個
+/// /主要那個)。原始格式是6碼數字(例如"233100")，轉換規則是前4碼+"-"+後2碼(例如"2331-00")，剛好
+/// 對應 TaxIndustryClassification 的 subclass 代碼格式——已用亞洲水泥實測驗證：財政部登記的
+/// "233100" 對到 "2331-00"「水泥製造」，跟實際主業完全吻合，不是巧合。
+///
+/// 因為來源檔案是全國性、不分上市櫃，這裡刻意只收 CompanyProfile 裡已經追蹤的公司(見
+/// companyIndustryClassification/service.ts)，不落地全部171萬筆。
+model CompanyIndustryClassification {
+  taxId   String         @id @map("tax_id")
+  company CompanyProfile @relation(fields: [taxId], references: [taxId], onDelete: Cascade)
+
+  industryCode       String                    @map("industry_code") // 轉換成 subclass 格式(例如"2331-00")，對應 TaxIndustryClassification.code
+  classification     TaxIndustryClassification @relation(fields: [industryCode], references: [code])
+  sourceIndustryName String                    @map("source_industry_name") // 財政部登記當下的行業名稱原文，供核對用(理論上該跟 classification.nameZh 一致)
+  registeredAddress  String?                   @map("registered_address") // 總公司登記地址，一併存下來供人工核對
+
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([industryCode])
+  @@map("company_industry_classifications")
+  @@schema("public")
 }
