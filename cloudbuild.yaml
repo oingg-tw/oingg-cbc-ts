@@ -1,0 +1,62 @@
+substitutions:
+  _REGION: asia-southeast1
+  _REPOSITORY: oingg-gov
+  _SERVICE: oingg-gov-ts
+
+steps:
+  # 測試/型別檢查關卡：這兩個沒過，後面的 image build/deploy 都不會執行（Cloud Build steps 依序失敗即中止）。
+  - id: test
+    name: node:22-trixie-slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        # postinstall（pnpm install 觸發）本身就會跑 prisma generate，不是只有下面那行手動呼叫的——
+        # 兩者都需要 DIRECT_URL 才能讓 prisma.config.ts 解析成功（不需要真的連得上，只要變數存在），
+        # 所以要在 pnpm install 之前就 export，不能只放在最後一行手動呼叫前面。
+        export DIRECT_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+        npm install -g pnpm@11
+        pnpm install --frozen-lockfile
+        npx prisma generate
+        pnpm test
+        npx tsc --noEmit
+
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/app:$SHORT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/app:latest
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/app
+
+  - id: deploy
+    name: gcr.io/cloud-builders/gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/app:$SHORT_SHA
+      - --region=${_REGION}
+      - --min-instances=0
+      - --no-allow-unauthenticated
+      # 那幾個跑很久的 ingest 端點（refresh-tracked 實測約 17 分鐘、company-industry-classification
+      # 要下載 322MB）遠超 Cloud Run 預設的 300 秒逾時，設到上限 3600 秒。Request-based billing
+      # （預設、沒有 --no-cpu-throttling）就夠：這個服務沒有請求之外還需要跑的背景工作。
+      - --timeout=3600
+      - --set-secrets=DATABASE_URL=gov-database-url:latest,TASK_SECRET=gov-task-secret:latest
+      - --set-env-vars=NODE_ENV=production
+      - --quiet
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/app:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/app:latest

@@ -6,6 +6,14 @@ WORKDIR /app
 
 RUN npm install -g pnpm@11
 
+# postinstall（pnpm install 觸發）會跑 prisma generate，讀 prisma.config.ts 時會直接檢查 DIRECT_URL
+# 這個環境變數存不存在（不需要真的連得上，只是讀設定檔這一步就會先擋）——容器裡沒有 .env，一定要
+# 先給一個格式正確的假值，不然連 `pnpm install` 本身都會失敗（實測發現，見
+# oingg-conductor-ts/docs/production-deployment.md「prisma generate 在 CI 環境會因為讀不到
+# DIRECT_URL 而失敗」）。用 ENV 而不是單一 RUN 裡 export，因為下面 `pnpm install --prod` 那步
+# 重新跑一次 install 時也會觸發同一個 postinstall，ENV 對整個 build stage 都有效。
+ENV DIRECT_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+
 # pnpm-workspace.yaml 是必要檔案：ultimate-express 依賴的 uWebSockets.js 走 GitHub 安裝，
 # pnpm 預設會擋（ERR_PNPM_EXOTIC_SUBDEP），一定要在 install 之前就存在。
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -14,16 +22,17 @@ COPY prisma.config.ts ./
 
 RUN pnpm install --frozen-lockfile
 
-# postinstall 不會自動產生 Prisma Client（跟本機一樣，需要顯式跑一次 generate）。
-RUN npx prisma generate
-
 COPY tsconfig.json ./
 COPY src ./src
 
 RUN pnpm run build
 
-# 只保留 production dependencies，縮小最終 image。
-RUN pnpm install --prod --frozen-lockfile
+# 只保留 production dependencies，縮小最終 image。這步會把 devDependencies 裡的 `prisma`（CLI）
+# 移除，但 pnpm 還是會照 @prisma/client 自己 package.json 定義的 postinstall 再跑一次
+# `prisma generate`——這時候 `prisma` 執行檔已經不在了，會直接失敗（sh: 1: prisma: not found）。
+# client 在上面 `pnpm install --frozen-lockfile` 那步已經產生過，這裡不需要任何 postinstall
+# 副作用，直接跳過（--ignore-scripts）。
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 FROM node:22-trixie-slim AS runner
 

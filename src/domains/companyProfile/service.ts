@@ -102,7 +102,7 @@ const registerCompanyProfileCore = async (stockCode: string, taxId: string, forc
         where: { taxId },
         include: { businessItems: { orderBy: { position: 'asc' } } },
       });
-    });
+    }, { timeout: 30000 }); // Prisma 預設 5 秒，Cloud Run min-instances=0 + Neon autosuspend 冷啟動很容易超過，比照 oingg-twse-ts 拉到 30 秒
 
     return { success: true, profile };
   } catch (error) {
