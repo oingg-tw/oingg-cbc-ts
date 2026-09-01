@@ -1,6 +1,6 @@
 import { type Request, type Response, type NextFunction } from 'ultimate-express';
 import { z } from 'zod';
-import { getCompanyBusinessItems } from './service';
+import { getCompanyBusinessItems } from '@/domains/companyBusinessItems/service';
 
 const paramsSchema = z.object({
   businessAccountingNo: z.string().regex(/^\d{8}$/, '統一編號須為 8 碼數字'),

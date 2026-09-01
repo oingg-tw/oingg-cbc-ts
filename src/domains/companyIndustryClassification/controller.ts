@@ -1,5 +1,5 @@
 import { type Request, type Response, type NextFunction } from 'ultimate-express';
-import { ingestCompanyIndustryClassification } from './service';
+import { ingestCompanyIndustryClassification } from '@/domains/companyIndustryClassification/service';
 
 export const ingestCompanyIndustryClassificationController = async (_req: Request, res: Response, next: NextFunction) => {
   try {

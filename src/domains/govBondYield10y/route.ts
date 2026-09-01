@@ -1,5 +1,5 @@
 import { Router } from 'ultimate-express';
-import { ingestGovBondYield10y } from './controller';
+import { ingestGovBondYield10y } from '@/domains/govBondYield10y/controller';
 
 const router = Router();
 

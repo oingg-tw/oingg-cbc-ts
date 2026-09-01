@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseMonthlyGovBondYield10y } from '../domains/govBondYield10y/parser';
-import type { CbcApiResponse } from '../adapters/cbc';
+import { parseMonthlyGovBondYield10y } from '@/domains/govBondYield10y/parser';
+import type { CbcApiResponse } from '@/adapters/cbc';
 
 const TARGET_COLUMN = "Bond market-10-year gov't bond rates in secondary market";
 

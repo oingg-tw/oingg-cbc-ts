@@ -1,5 +1,5 @@
-import type { CbcApiResponse } from '../../adapters/cbc';
-import type { MonthlyGovBondYield10yPoint } from './types';
+import type { CbcApiResponse } from '@/adapters/cbc';
+import type { MonthlyGovBondYield10yPoint } from '@/domains/govBondYield10y/types';
 
 // 目標欄位在 data.structure 裡的顯示名稱（已用真實回應核對過，2026-08-28）。用名稱比對找欄位索引，
 // 不寫死數字位置（例如「第 20 欄」）——CBC 官方文件沒承諾欄位順序永遠不變，用名稱比對比較不會因為

@@ -1,4 +1,4 @@
-import { fetchCompanyBusinessItems, type GcisCompanyRecord } from '../../adapters/gcis';
+import { fetchCompanyBusinessItems, type GcisCompanyRecord } from '@/adapters/gcis';
 
 export interface GetCompanyBusinessItemsResult {
   success: boolean;

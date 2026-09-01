@@ -1,5 +1,5 @@
 import { Router } from 'ultimate-express';
-import { registerCompanyProfileController, refreshTrackedCompanyProfilesController } from './controller';
+import { registerCompanyProfileController, refreshTrackedCompanyProfilesController } from '@/domains/companyProfile/controller';
 
 const router = Router();
 

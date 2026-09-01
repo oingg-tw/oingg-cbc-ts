@@ -6,12 +6,12 @@ import express from 'ultimate-express';
 import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
-import { connectDb } from './adapters/prisma/index';
-import { swaggerUi, swaggerSpec } from './adapters/swagger';
-import { config } from './shared/config';
-import { setStartupTime } from './shared/serverInfo';
-import routes from './routes';
-import errorHandler from './shared/errorHandler';
+import { connectDb } from '@/adapters/prisma/index';
+import { swaggerUi, swaggerSpec } from '@/adapters/swagger';
+import { config } from '@/shared/config';
+import { setStartupTime } from '@/shared/serverInfo';
+import routes from '@/routes';
+import errorHandler from '@/shared/errorHandler';
 
 const app = express();
 

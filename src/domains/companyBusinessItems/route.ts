@@ -1,5 +1,5 @@
 import { Router } from 'ultimate-express';
-import { getCompanyBusinessItemsController } from './controller';
+import { getCompanyBusinessItemsController } from '@/domains/companyBusinessItems/controller';
 
 const router = Router();
 

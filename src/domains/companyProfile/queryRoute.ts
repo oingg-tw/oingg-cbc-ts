@@ -4,7 +4,7 @@ import {
   getCompanyProfileByStockCodeController,
   listCompanyProfileIngestionFailuresController,
   listRegisteredStockCodesController,
-} from './controller';
+} from '@/domains/companyProfile/controller';
 
 const router = Router();
 

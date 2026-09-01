@@ -1,6 +1,6 @@
 import { type Request, type Response, type NextFunction } from 'ultimate-express';
 import { z } from 'zod';
-import { ingestMonthlyGovBondYield10y } from './service';
+import { ingestMonthlyGovBondYield10y } from '@/domains/govBondYield10y/service';
 
 const requestSchema = z.object({
   force: z.boolean().optional().default(false), // true 時已存在的月份也強制覆寫

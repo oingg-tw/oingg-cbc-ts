@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { config, stripQuotes } from '../../shared/config';
+import { config, stripQuotes } from '@/shared/config';
 
 // Prisma 7 removed schema-level `url`/`directUrl` — the runtime client now needs a driver adapter
 // passed in explicitly. Pooled connection (DATABASE_URL, 帶 -pooler) here; `prisma migrate` uses

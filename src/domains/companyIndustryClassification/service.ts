@@ -1,8 +1,8 @@
 import { createInterface } from 'node:readline';
 import { Readable } from 'node:stream';
-import prisma from '../../adapters/prisma/index';
-import { FIA_BUSINESS_TAX_REGISTRY_CSV_URL, parseFiaBusinessTaxRegistryLine } from '../../adapters/fia/client';
-import type { IngestCompanyIndustryClassificationResult } from './types';
+import prisma from '@/adapters/prisma/index';
+import { FIA_BUSINESS_TAX_REGISTRY_CSV_URL, parseFiaBusinessTaxRegistryLine } from '@/adapters/fia/client';
+import type { IngestCompanyIndustryClassificationResult } from '@/domains/companyIndustryClassification/types';
 
 const EXPORT_DATASET = 'company_industry_classification'; // 對應 export.company_industry_classification view
 

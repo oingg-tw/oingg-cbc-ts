@@ -1,5 +1,5 @@
 import { Router } from 'ultimate-express';
-import { ingestCompanyIndustryClassificationController } from './controller';
+import { ingestCompanyIndustryClassificationController } from '@/domains/companyIndustryClassification/controller';
 
 const router = Router();
 

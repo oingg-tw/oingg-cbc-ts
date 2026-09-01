@@ -1,4 +1,4 @@
-import type { GcisCompanyBusinessItem } from '../../adapters/gcis';
+import type { GcisCompanyBusinessItem } from '@/adapters/gcis';
 
 // GCIS 回應裡，不少公司的營業項目會整列重複兩次——不是序號剛好撞在一起，是 seqNo/itemCode/itemDesc
 // 三個欄位完全一樣的整列重複（實測驗證，見雲豹能源科技 42852207：56 筆原始資料其實只有 28 個不重複

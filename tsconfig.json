@@ -13,9 +13,26 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
 
-    /* Module settings for Node.js ESM projects that use a bundler/runner like tsx */
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    /* NodeNext = TypeScript's current recommended setting for Node.js projects (not the legacy
+       "Node10" resolver) — it applies Node's real module-resolution algorithm (package.json
+       "exports" fields, conditional exports, etc.), and picks CJS vs ESM output per-file based on
+       the nearest package.json's "type" field. This package.json has no "type": "module", so output
+       is CommonJS (see adapters/swagger/index.ts's __dirname comment for the concrete consequence)
+       — matches oingg-tpex-ts/oingg-tdcc-ts/oingg-sitca-ts, same tsconfig shape.
+
+       Paired with `paths` below + `tsc-alias` in the build script: imports use the `@/*` alias, not
+       relative paths, so NodeNext's "relative imports need an explicit .js extension" rule never
+       applies to them in source — tsc-alias adds the correct extension when it rewrites the alias to
+       a relative path in the compiled output. Discovered 2026-09-01 while building the Dockerfile for
+       the first real deploy: this project's imports were extensionless relative paths, which tsx
+       (dev) resolves fine but plain `node dist/index.js` (prod, no bundler) rejected with
+       ERR_MODULE_NOT_FOUND — switching to the `@/*` + tsc-alias pattern fixed it without having to
+       hand-edit every import statement in the codebase to add `.js` extensions. */
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
 
     /* Build options */
     "outDir": "dist",

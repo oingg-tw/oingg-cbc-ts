@@ -1,5 +1,5 @@
 import { Router } from 'ultimate-express';
-import { listTaxIndustryClassificationController, getTaxIndustryClassificationController } from './controller';
+import { listTaxIndustryClassificationController, getTaxIndustryClassificationController } from '@/domains/taxIndustryClassification/controller';
 
 const router = Router();
 

@@ -1,4 +1,4 @@
-import prisma from '../../adapters/prisma/index';
+import prisma from '@/adapters/prisma/index';
 import type { TaxIndustryClassification } from '@prisma/client';
 
 export interface ListTaxIndustryClassificationFilter {

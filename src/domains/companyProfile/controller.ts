@@ -7,8 +7,8 @@ import {
   getCompanyProfileByStockCode,
   listCompanyProfileIngestionFailures,
   listRegisteredStockCodes,
-} from './service';
-import type { CompanyProfileWithBusinessItems } from './types';
+} from '@/domains/companyProfile/service';
+import type { CompanyProfileWithBusinessItems } from '@/domains/companyProfile/types';
 
 const registerItemSchema = z.object({
   stockCode: z.string().regex(/^[0-9A-Z]{4,6}$/, '證券代碼須為 4-6 碼英數字'),

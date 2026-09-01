@@ -1,7 +1,7 @@
-import prisma from '../../adapters/prisma/index';
-import { fetchCbcItem } from '../../adapters/cbc';
-import { parseMonthlyGovBondYield10y } from './parser';
-import type { MonthlyGovBondYield10yPoint } from './types';
+import prisma from '@/adapters/prisma/index';
+import { fetchCbcItem } from '@/adapters/cbc';
+import { parseMonthlyGovBondYield10y } from '@/domains/govBondYield10y/parser';
+import type { MonthlyGovBondYield10yPoint } from '@/domains/govBondYield10y/types';
 
 const ITEM_CODE = 'EG43M01en';
 const EXPORT_DATASET = 'monthly_gov_bond_yield_10y'; // 對應 export.monthly_gov_bond_yield_10y view，見 prisma/schema.prisma 的 IngestionRun 註解

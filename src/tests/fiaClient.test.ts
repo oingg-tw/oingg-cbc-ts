@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseFiaBusinessTaxRegistryLine } from '../adapters/fia/client';
+import { parseFiaBusinessTaxRegistryLine } from '@/adapters/fia/client';
 
 describe('parseFiaBusinessTaxRegistryLine', () => {
   it('parses a headquarters row (統一編號=自己、總機構統一編號=空白)', () => {

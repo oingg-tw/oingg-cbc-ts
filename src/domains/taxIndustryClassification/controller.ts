@@ -1,6 +1,6 @@
 import { type Request, type Response, type NextFunction } from 'ultimate-express';
 import { z } from 'zod';
-import { listTaxIndustryClassification, getTaxIndustryClassificationByCode } from './service';
+import { listTaxIndustryClassification, getTaxIndustryClassificationByCode } from '@/domains/taxIndustryClassification/service';
 
 const listQuerySchema = z.object({
   level: z.enum(['section', 'division', 'group', 'class', 'subclass']).optional(),

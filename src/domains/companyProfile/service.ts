@@ -1,9 +1,9 @@
 import { Prisma } from '@prisma/client';
 import type { CompanyProfileIngestionFailure } from '@prisma/client';
-import prisma from '../../adapters/prisma/index';
-import { fetchCompanyBusinessItems } from '../../adapters/gcis';
-import { dedupeBusinessItems } from './dedupe';
-import type { RegisterCompanyProfileResult, CompanyProfileWithBusinessItems } from './types';
+import prisma from '@/adapters/prisma/index';
+import { fetchCompanyBusinessItems } from '@/adapters/gcis';
+import { dedupeBusinessItems } from '@/domains/companyProfile/dedupe';
+import type { RegisterCompanyProfileResult, CompanyProfileWithBusinessItems } from '@/domains/companyProfile/types';
 
 // company_profile_ingestion_failures 只記「目前還沒成功過的統編」：失敗就 upsert（累加 attempts、
 // 更新錯誤訊息），成功（不論新登記還是 skip 既有資料）就把該統編的紀錄刪掉。這裡包 try/catch 是

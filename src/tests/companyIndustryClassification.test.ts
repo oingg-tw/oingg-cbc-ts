@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toSubclassCode } from '../domains/companyIndustryClassification/service';
+import { toSubclassCode } from '@/domains/companyIndustryClassification/service';
 
 describe('toSubclassCode', () => {
   it('converts a 6-digit FIA code into tax_industry_classification subclass format', () => {

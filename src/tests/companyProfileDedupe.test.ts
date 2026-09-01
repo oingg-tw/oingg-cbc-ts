@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { dedupeBusinessItems } from '../domains/companyProfile/dedupe';
-import type { GcisCompanyBusinessItem } from '../adapters/gcis';
+import { dedupeBusinessItems } from '@/domains/companyProfile/dedupe';
+import type { GcisCompanyBusinessItem } from '@/adapters/gcis';
 
 const item = (seqNo: string, code: string, desc: string): GcisCompanyBusinessItem => ({
   Business_Seq_NO: seqNo,

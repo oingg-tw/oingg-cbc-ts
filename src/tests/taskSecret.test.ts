@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Request, Response } from 'ultimate-express';
-import { requireTaskSecret } from '../shared/middleware';
+import { requireTaskSecret } from '@/shared/middleware';
 
 const ORIGINAL_TASK_SECRET = process.env.TASK_SECRET;
 

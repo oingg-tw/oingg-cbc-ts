@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'ultimate-express';
 import { timingSafeEqual } from 'crypto';
-import { stripQuotes } from './config';
+import { stripQuotes } from '@/shared/config';
 
 /**
  * timingSafeEqual 要求兩個 buffer 等長，否則直接 throw；長度不同本身就代表密鑰不對，
