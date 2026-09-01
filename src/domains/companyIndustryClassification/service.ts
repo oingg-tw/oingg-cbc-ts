@@ -21,7 +21,7 @@ const recordIngestionRun = async (status: 'success' | 'failed', rowCount: number
 // 財政部原始代碼是 6 碼數字（例如 "233100"），tax_industry_classification 的 subclass 代碼格式是
 // 前4碼-後2碼（例如 "2331-00"）——已用亞洲水泥(統編03244509)實測驗證過這個轉換規則跟真實資料對得起來
 // （"233100" 對到 "2331-00" 水泥製造，符合實際主業）。
-const toSubclassCode = (raw: string): string | null => {
+export const toSubclassCode = (raw: string): string | null => {
   if (!/^\d{6}$/.test(raw)) return null;
   return `${raw.slice(0, 4)}-${raw.slice(4, 6)}`;
 };

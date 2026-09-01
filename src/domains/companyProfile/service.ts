@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import type { CompanyProfileIngestionFailure } from '@prisma/client';
 import prisma from '../../adapters/prisma/index';
 import { fetchCompanyBusinessItems } from '../../adapters/gcis';
+import { dedupeBusinessItems } from './dedupe';
 import type { RegisterCompanyProfileResult, CompanyProfileWithBusinessItems } from './types';
 
 // company_profile_ingestion_failures 只記「目前還沒成功過的統編」：失敗就 upsert（累加 attempts、
@@ -82,18 +83,9 @@ const registerCompanyProfileCore = async (stockCode: string, taxId: string, forc
       });
 
       // GCIS 回應是「當下完整清單」而非增量，整批刪除重建比逐筆比對更新簡單也更不容易留下髒資料。
-      //
-      // 實測發現（雲豹能源科技 42852207 等）：不少公司的回應裡，每一筆營業項目會原封不動出現兩次
-      // ——不是序號剛好撞在一起，是 seqNo/itemCode/itemDesc 三個欄位完全一樣的整列重複。這是 GCIS
-      // 自己回應內容的問題，不是我們解析錯；直接照登會讓同一個項目在 DB 裡出現兩次。用
-      // seqNo+itemCode+itemDesc 三個欄位的組合去重，只保留第一次出現的那筆。
-      const seenKeys = new Set<string>();
-      const dedupedItems = record.Cmp_Business.filter((item) => {
-        const key = `${item.Business_Seq_NO}|${item.Business_Item}|${item.Business_Item_Desc}`;
-        if (seenKeys.has(key)) return false;
-        seenKeys.add(key);
-        return true;
-      });
+      // dedupeBusinessItems 處理 GCIS 回應本身會整列重複的問題，見該函式註解與
+      // src/domains/companyProfile/dedupe.test.ts。
+      const dedupedItems = dedupeBusinessItems(record.Cmp_Business);
 
       await tx.companyBusinessItem.deleteMany({ where: { taxId } });
       await tx.companyBusinessItem.createMany({

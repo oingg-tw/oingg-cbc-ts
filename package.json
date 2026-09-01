@@ -5,6 +5,7 @@
   "main": "src/index.ts",
   "scripts": {
     "test": "vitest run",
+    "test:watch": "vitest",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "postinstall": "prisma generate",
