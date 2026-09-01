@@ -138,6 +138,41 @@ export const listCompanyProfileIngestionFailures = (): Promise<CompanyProfileIng
   return prisma.companyProfileIngestionFailure.findMany({ orderBy: { updatedAt: 'desc' } });
 };
 
+export interface RefreshTrackedCompanyProfilesResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  failures: Array<{ stockCode: string; taxId: string; error?: string }>;
+}
+
+// 「重跑目前所有已追蹤公司」——不是靠外部呼叫端提供清單，清單直接從 company_profiles 現有資料撈，
+// 撈到幾筆就處理幾筆，不寫死數字。每一筆都強制 force=true：這個端點存在的目的就是刷新既有資料
+// （公司登記的營業項目可能變動過），如果沿用預設的「已存在就跳過」邏輯，對已經在追蹤清單裡的公司
+// 會直接全部跳過、等於沒做事，語意上說不通。
+//
+// 逐筆序列處理（原因跟 controller.ts 的批次登記一樣：GCIS client 本身有節流，平行送不會加速，
+// 序列處理才能讓單筆失敗不影響其他筆）。回應刻意不含每筆的完整 profile/businessItems——追蹤清單
+// 現在有 1000+ 筆，每筆都塞完整資料會讓回應本體過大；只回統計數字跟失敗清單，成功的細節可以透過
+// GET /api/query/company-profile/tax-id/:taxId 個別查，失敗的細節也已經另外記在
+// company_profile_ingestion_failures（GET /api/query/company-profile/failures）。
+export const refreshTrackedCompanyProfiles = async (): Promise<RefreshTrackedCompanyProfilesResult> => {
+  const targets = await prisma.companyProfile.findMany({ select: { stockCode: true, taxId: true } });
+
+  let succeeded = 0;
+  const failures: Array<{ stockCode: string; taxId: string; error?: string }> = [];
+
+  for (const { stockCode, taxId } of targets) {
+    const result = await registerCompanyProfile(stockCode, taxId, true);
+    if (result.success) {
+      succeeded++;
+    } else {
+      failures.push({ stockCode, taxId, error: result.error });
+    }
+  }
+
+  return { total: targets.length, succeeded, failed: failures.length, failures };
+};
+
 export interface RegisteredStockCode {
   stockCode: string;
   taxId: string;

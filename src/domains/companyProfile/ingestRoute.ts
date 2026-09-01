@@ -1,5 +1,5 @@
 import { Router } from 'ultimate-express';
-import { registerCompanyProfileController } from './controller';
+import { registerCompanyProfileController, refreshTrackedCompanyProfilesController } from './controller';
 
 const router = Router();
 
@@ -57,5 +57,30 @@ const router = Router();
  *         description: 請求格式錯誤（例如陣列為空、超過 200 筆、代碼格式不對）。
  */
 router.post('/company-profile', registerCompanyProfileController);
+
+/**
+ * @swagger
+ * /api/ingest/company-profile/refresh-tracked:
+ *   post:
+ *     summary: 重新抓取目前所有已追蹤公司的 GCIS 營業項目
+ *     description: >
+ *       不需要外部提供清單——清單直接從 company_profiles 現有資料撈（目前有多少家就處理多少家，
+ *       不寫死數字），對每一家強制 force=true 重新向 GCIS 抓取並覆寫（公司登記的營業項目可能變動
+ *       過，這個端點存在的目的就是刷新，不是像 POST /company-profile 那樣有「已存在就跳過」的邏輯）。
+ *       逐筆序列處理，同樣受 GCIS client 的節流與重試保護。
+ *
+ *       目前追蹤清單有 1000+ 家，這是同步、long-running 的請求——GCIS 節流下大約每家 1 秒，全部跑完
+ *       可能要 15-20 分鐘，呼叫端（例如未來接上的排程器）要設夠長的逾時時間。回應不含每筆的完整
+ *       profile/businessItems（避免回應本體過大），只回統計數字與失敗清單；失敗的細節另外看
+ *       GET /api/query/company-profile/failures。
+ *     tags:
+ *       - Ingestion
+ *     security:
+ *       - TaskSecret: []
+ *     responses:
+ *       200:
+ *         description: 處理完成，回傳整體統計（total/succeeded/failed）與失敗清單。
+ */
+router.post('/company-profile/refresh-tracked', refreshTrackedCompanyProfilesController);
 
 export default router;

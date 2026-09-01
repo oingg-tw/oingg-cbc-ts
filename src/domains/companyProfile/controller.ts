@@ -2,6 +2,7 @@ import { type Request, type Response, type NextFunction } from 'ultimate-express
 import { z } from 'zod';
 import {
   registerCompanyProfile,
+  refreshTrackedCompanyProfiles,
   getCompanyProfileByTaxId,
   getCompanyProfileByStockCode,
   listCompanyProfileIngestionFailures,
@@ -71,6 +72,19 @@ export const registerCompanyProfileController = async (req: Request, res: Respon
     });
   } catch (error) {
     console.error('Company profile registration failed:', error);
+    next(error);
+  }
+};
+
+export const refreshTrackedCompanyProfilesController = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await refreshTrackedCompanyProfiles();
+    res.status(200).json({
+      message: `共 ${result.total} 家已追蹤公司：${result.succeeded} 家更新成功、${result.failed} 家失敗。`,
+      ...result,
+    });
+  } catch (error) {
+    console.error('Refreshing tracked company profiles failed:', error);
     next(error);
   }
 };
