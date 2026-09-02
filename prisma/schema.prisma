@@ -29,6 +29,115 @@ model MonthlyGovBondYield10y {
   @@schema("public")
 }
 
+/// 消費者物價基本分類指數(CPI)月資料，由 /api/ingest/monthly-cpi 觸發向主計總處固定路徑統計檔案
+/// （pr0101a1m.xml，無正式 REST API）抓取。原始檔案有 81 個細項子分類（例如「米類及其製品」細到
+/// 菜籃子等級），這裡只收「總指數」跟七大類指數（category 欄位），理由跟用途見
+/// monthlyCpi/types.ts 的 CpiCategory 註解——這是總經篩選因子，不是 CPI 籃子研究。indexValue（原始值，
+/// 指數）跟 yoyChangePercent（年增率%）是官方回應裡同一個 Item 的兩種數值，合併存成同一列，不是
+/// 兩張表。兩者都可能是 null：indexValue 理論上每月都有；yoyChangePercent 在資料起始年份附近常缺值
+/// （沒有前一年可比較），null 是真的缺值，不是 0。
+model MonthlyCpi {
+  year     Int // 西元年
+  month    Int // 1-12
+  category String // 'total' | 'food' | 'clothing' | 'housing' | 'transport_communication' | 'medical' | 'education_recreation' | 'misc'，見 monthlyCpi/types.ts 的 CpiCategory
+
+  indexValue       Decimal? @map("index_value") @db.Decimal(10, 4)
+  yoyChangePercent Decimal? @map("yoy_change_percent") @db.Decimal(8, 4)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@id([year, month, category])
+  @@map("monthly_cpi")
+  @@schema("public")
+}
+
+/// 國民所得統計－GDP貢獻度－依支出分季資料，由 /api/ingest/quarterly-gdp（尚未實作，先建表避免卡到
+/// 其他 agent）觸發向主計總處固定路徑統計檔案（na8102a7q.xml，跟 monthly_cpi 同一種 DataSet/Obs
+/// XML 格式，見 adapters/dgbas/client.ts）抓取。官方原始檔案只有 12 個項目（不像 CPI 有 81 個細項
+/// 要篩選），全部保留：經濟成長率本身，加上「國內需求」「國外淨需求」兩個支出面向底下各自的小計跟
+/// 細項（民間消費/政府消費/固定資本形成〈又細分民間/公營/政府〉/存貨變動/進出口）。跟 monthly_cpi
+/// 一樣，contributionPoints（原始值，百分點貢獻度）跟 yoyChangePercent（年增率%）是官方回應裡同一個
+/// Item 的兩種數值，合併存成同一列。category 值見 quarterlyGdp/types.ts 的 GdpCategory（domain 尚未
+/// 建立時，這份 schema 註解是唯一的權威說明，之後補 domain 程式碼時要對得上）。
+model QuarterlyGdp {
+  year     Int // 西元年
+  quarter  Int // 1-4
+  category String
+  // 'growth_rate' | 'domestic_demand_total' | 'private_consumption' | 'government_consumption' |
+  // 'fixed_capital_formation_total' | 'fixed_capital_formation_private' |
+  // 'fixed_capital_formation_public_enterprise' | 'fixed_capital_formation_government' |
+  // 'inventory_change' | 'net_external_demand_total' | 'exports' | 'imports'
+
+  contributionPoints Decimal? @map("contribution_points") @db.Decimal(10, 4) // 原始值，百分點貢獻度（Item_VALUE 對應「原始值」TYPE）
+  yoyChangePercent   Decimal? @map("yoy_change_percent") @db.Decimal(8, 4) // 年增率(%)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@id([year, quarter, category])
+  @@map("quarterly_gdp")
+  @@schema("public")
+}
+
+/// 人力資源調查失業率月資料，由 /api/ingest/monthly-unemployment-rate（尚未實作，先建表避免卡到其他
+/// agent）觸發向主計總處固定路徑統計檔案（mp0101a07.xml）抓取。跟 monthly_cpi/quarterly_gdp 的
+/// DataSet/Obs 格式不同，官方回應是攤平的 <DataCollection><失業率>...每個欄位各自一個 XML 標籤
+/// （見 CBC-ITEM-CODES.md 之外另一種真實驗證過的格式，2026-09-02）；解析時要轉成跟其他總經 domain
+/// 一致的 (year, month, category, ratePercent) 長表格式，不是照抄原始的寬表結構。原始檔案第一列是
+/// 「年度」摘要（TIME_PERIOD 只有西元年、沒有月份，例如單獨的"1978"），之後才是逐月資料——年度摘要列
+/// 不收，只收月資料。category 值見 monthlyUnemploymentRate/types.ts 的 UnemploymentCategory（domain
+/// 尚未建立時，這份 schema 註解是唯一的權威說明）。
+model MonthlyUnemploymentRate {
+  year     Int // 西元年
+  month    Int // 1-12
+  category String
+  // 'total' | 'male' | 'female' |
+  // 'age_15_19' | 'age_20_24' | 'age_25_29' | 'age_30_34' | 'age_35_39' | 'age_40_44' |
+  // 'age_45_49' | 'age_50_54' | 'age_55_59' | 'age_60_64' | 'age_65_over' |
+  // 'edu_junior_high_and_below' | 'edu_primary_school_and_below' | 'edu_junior_high' |
+  // 'edu_senior_high' | 'edu_college_and_above' | 'edu_junior_college' | 'edu_university_and_above'
+  // 教育程度幾個類別彼此有母子集關係（例如 edu_junior_high_and_below 包含 edu_primary_school_and_below），
+  // 是官方檔案本來就這樣分組，不是我方重複計算，解析時原樣保留全部類別，不做去重篩選。
+
+  ratePercent Decimal? @map("rate_percent") @db.Decimal(8, 4)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@id([year, month, category])
+  @@map("monthly_unemployment_rate")
+  @@schema("public")
+}
+
+/// 景氣指標及燈號月資料，由 /api/ingest/monthly-business-cycle-indicator（尚未實作，先建表避免卡到
+/// 其他 agent）觸發向國發會固定路徑 ZIP 檔案（ws.ndc.gov.tw，內含多個 CSV，這裡只解析主檔
+/// 「景氣指標與燈號.csv」）抓取，跟 monthly_cpi/quarterly_gdp/monthly_unemployment_rate 用的主計總處
+/// XML 完全不同格式，是 UTF-8 BOM 的 CSV，一列就是一個月完整資料（不是長表，這幾個指標本身是不同
+/// 概念、不是同一個維度的分類，維持官方原始的寬表結構）。signalLight 存官方燈號文字原文（例如
+/// "紅"/"黃紅"/"綠"/"黃藍"/"藍"），不轉換成數字代碼，避免猜錯官方對照表。ZIP 裡另外 4 個「構成項目」
+/// CSV（M1B、股價指數、失業率等細項）暫不收，只收燈號主檔——如果之後要往下鑽到細項再擴充。
+model MonthlyBusinessCycleIndicator {
+  year  Int // 西元年
+  month Int // 1-12
+
+  leadingIndexComposite    Decimal? @map("leading_index_composite") @db.Decimal(10, 4) // 領先指標綜合指數
+  leadingIndexDetrended    Decimal? @map("leading_index_detrended") @db.Decimal(10, 4) // 領先指標不含趨勢指數
+  coincidentIndexComposite Decimal? @map("coincident_index_composite") @db.Decimal(10, 4) // 同時指標綜合指數
+  coincidentIndexDetrended Decimal? @map("coincident_index_detrended") @db.Decimal(10, 4) // 同時指標不含趨勢指數
+  laggingIndexComposite    Decimal? @map("lagging_index_composite") @db.Decimal(10, 4) // 落後指標綜合指數
+  laggingIndexDetrended    Decimal? @map("lagging_index_detrended") @db.Decimal(10, 4) // 落後指標不含趨勢指數
+  signalScore              Decimal? @map("signal_score") @db.Decimal(6, 2) // 景氣對策信號綜合分數
+  signalLight              String?  @map("signal_light") // 景氣對策信號燈號文字原文
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@id([year, month])
+  @@map("monthly_business_cycle_indicator")
+  @@schema("public")
+}
+
 /// 財政部統計處《中華民國稅務行業標準分類（第9次修訂）》代碼字典，一列對應五層階層（大/中/小/細/
 /// 子類）中的一個節點——不是只存葉節點，而是每一層都各自存一列，欄位裡自己那一層填自己的 code，
 /// 上層祖先代碼另外存在 sectionCode/divisionCode/.../classCode 欄位，方便直接用某一層代碼過濾

@@ -1,6 +1,7 @@
 import { Router } from 'ultimate-express';
 import rootRouter from '@/domains/system/root';
 import govBondYield10yRouter from '@/domains/govBondYield10y/route';
+import monthlyCpiRouter from '@/domains/monthlyCpi/route';
 import companyBusinessItemsRouter from '@/domains/companyBusinessItems/route';
 import taxIndustryClassificationRouter from '@/domains/taxIndustryClassification/route';
 import companyProfileIngestRouter from '@/domains/companyProfile/ingestRoute';
@@ -27,6 +28,7 @@ router.use(rootRouter);
 const ingestRouter = Router();
 ingestRouter.use(requireTaskSecret, ingestRateLimit);
 ingestRouter.use(govBondYield10yRouter);
+ingestRouter.use(monthlyCpiRouter);
 ingestRouter.use(companyProfileIngestRouter);
 ingestRouter.use(companyIndustryClassificationRouter);
 
