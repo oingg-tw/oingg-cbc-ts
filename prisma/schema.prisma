@@ -69,8 +69,8 @@ model QuarterlyGdp {
   // 'fixed_capital_formation_public_enterprise' | 'fixed_capital_formation_government' |
   // 'inventory_change' | 'net_external_demand_total' | 'exports' | 'imports'
 
-  contributionPoints Decimal? @map("contribution_points") @db.Decimal(10, 4) // 原始值，百分點貢獻度（Item_VALUE 對應「原始值」TYPE）
-  yoyChangePercent   Decimal? @map("yoy_change_percent") @db.Decimal(8, 4) // 年增率(%)
+  contributionPoints Decimal? @map("contribution_points") @db.Decimal(10, 4) // 原始值，百分點貢獻度（Item_VALUE 對應「原始值」TYPE，實測最大值 25.43，Decimal(10,4) 夠用）
+  yoyChangePercent   Decimal? @map("yoy_change_percent") @db.Decimal(14, 4) // 年增率(%)——實測驗證過「國外淨需求-小計」1986Q1 這欄真實值是 24300（基期接近零時年增率會爆量，不是資料錯誤），比其他 domain 的 yoyChangePercent 欄位（Decimal(8,4)）寬很多就是為了撐住這種極端值
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
