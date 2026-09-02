@@ -83,8 +83,8 @@ model CompanyProfile {
   companyStatusDesc String @map("company_status_desc")
   companySetupDate  String @map("company_setup_date")
 
-  businessItems          CompanyBusinessItem[]
-  industryClassification CompanyIndustryClassification?
+  businessItems           CompanyBusinessItem[]
+  industryClassifications CompanyIndustryClassification[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -162,31 +162,38 @@ model IngestionRun {
   @@schema("export")
 }
 
-/// 每家公司(用 CompanyProfile.taxId)對應「一個」官方行業分類代碼，來源是財政部財政資訊中心《全國
-/// 營業(稅籍)登記資料集》(data.gov.tw/dataset/9400，每日更新、約171萬列全國登記營業人，沒有查詢式
-/// API，只能整份下載再過濾)——不是拿 CompanyBusinessItem(GCIS 營業項目)反推，那是完全不同的代碼
-/// 系統且一家公司常十幾筆、雜訊很大(2026-08-31 已用亞洲水泥 1102 實測驗證過對不起來)。
+/// 每家公司(用 CompanyProfile.taxId)對應「最多四個」官方行業分類代碼，來源是財政部財政資訊中心
+/// 《全國營業(稅籍)登記資料集》(data.gov.tw/dataset/9400，每日更新、約171萬列全國登記營業人，沒有
+/// 查詢式 API，只能整份下載再過濾)——不是拿 CompanyBusinessItem(GCIS 營業項目)反推，那是完全不同的
+/// 代碼系統且一家公司常十幾筆、雜訊很大(2026-08-31 已用亞洲水泥 1102 實測驗證過對不起來)。
 ///
-/// 這份稅籍登記資料裡，同一個統編會有多列(總公司+各分公司/廠各自的稅籍登記)，用「統一編號=自己、
-/// 總機構統一編號=空白」那一列鎖定總公司本身的登記資料，取其主要行業代號(欄位裡最多4個，只取第1個
-/// /主要那個)。原始格式是6碼數字(例如"233100")，轉換規則是前4碼+"-"+後2碼(例如"2331-00")，剛好
-/// 對應 TaxIndustryClassification 的 subclass 代碼格式——已用亞洲水泥實測驗證：財政部登記的
-/// "233100" 對到 "2331-00"「水泥製造」，跟實際主業完全吻合，不是巧合。
+/// 這份稅籍登記資料裡，同一個統編會有多「列」(總公司+各分公司/廠各自的稅籍登記)，用「統一編號=自己、
+/// 總機構統一編號=空白」鎖定總公司本身那一列；但同一列裡本身又有最多四組行業代號欄位(主要行業代號+
+/// 次要1/2/3，實測驗證過統編22099131台積電同一列就有三組：主要261199「其他積體電路製造」、次要1
+/// 261111「矽晶圓製造」、次要2 282011「一次電池製造」)，早期版本只取主要那組，2026-09-02 改成四組
+/// 都存，用 rank 區分(0=主要，1/2/3=次要，對應行業代號/行業代號1/2/3 的原始欄位順序)。原始格式是
+/// 6碼數字(例如"233100")，轉換規則是前4碼+"-"+後2碼(例如"2331-00")，剛好對應
+/// TaxIndustryClassification 的 subclass 代碼格式——已用亞洲水泥實測驗證：財政部登記的 "233100"
+/// 對到 "2331-00"「水泥製造」，跟實際主業完全吻合，不是巧合。
 ///
 /// 因為來源檔案是全國性、不分上市櫃，這裡刻意只收 CompanyProfile 裡已經追蹤的公司(見
-/// companyIndustryClassification/service.ts)，不落地全部171萬筆。
+/// companyIndustryClassification/service.ts)，不落地全部171萬筆。每次重新 ingest 整批刪除重建(理由
+/// 跟 CompanyBusinessItem 一樣：來源是「當下完整清單」，不逐筆比對更新)。
 model CompanyIndustryClassification {
-  taxId   String         @id @map("tax_id")
+  id      Int            @id @default(autoincrement())
+  taxId   String         @map("tax_id")
   company CompanyProfile @relation(fields: [taxId], references: [taxId], onDelete: Cascade)
 
+  rank               Int                       @map("rank") // 0=主要(行業代號)，1/2/3=次要(行業代號1/2/3)，同一統編不會重複
   industryCode       String                    @map("industry_code") // 轉換成 subclass 格式(例如"2331-00")，對應 TaxIndustryClassification.code
   classification     TaxIndustryClassification @relation(fields: [industryCode], references: [code])
   sourceIndustryName String                    @map("source_industry_name") // 財政部登記當下的行業名稱原文，供核對用(理論上該跟 classification.nameZh 一致)
-  registeredAddress  String?                   @map("registered_address") // 總公司登記地址，一併存下來供人工核對
+  registeredAddress  String?                   @map("registered_address") // 總公司登記地址，一併存下來供人工核對(同一統編的每一列重複存，換取查詢時不用額外 join)
 
   fetchedAt DateTime @default(now()) @map("fetched_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
+  @@unique([taxId, rank])
   @@index([industryCode])
   @@map("company_industry_classifications")
   @@schema("public")

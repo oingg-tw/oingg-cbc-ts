@@ -13,7 +13,7 @@ export const ingestCompanyIndustryClassificationController = async (_req: Reques
     }
 
     res.status(200).json({
-      message: `共追蹤 ${result.targetCount} 家公司：${result.matched} 家成功比對到官方行業分類，${result.notFoundInRegistry} 家在稅籍登記檔裡找不到總公司列，${result.invalidIndustryCode} 家行業代號對不到分類表。`,
+      message: `共追蹤 ${result.targetCount} 家公司：${result.matched} 家成功比對到官方行業分類（共 ${result.totalClassificationRows} 筆分類，含主要+次要行業代號），${result.notFoundInRegistry} 家在稅籍登記檔裡找不到總公司列，${result.invalidIndustryCode} 家行業代號對不到分類表。`,
       ...result,
     });
   } catch (error) {

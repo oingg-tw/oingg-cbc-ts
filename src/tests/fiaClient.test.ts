@@ -10,8 +10,7 @@ describe('parseFiaBusinessTaxRegistryLine', () => {
       taxId: '03244509',
       headOfficeTaxId: '',
       businessName: '亞洲水泥股份有限公司',
-      primaryIndustryCode: '233100',
-      primaryIndustryName: '水泥製造',
+      industryCodes: [{ code: '233100', name: '水泥製造' }],
     });
   });
 
@@ -26,6 +25,27 @@ describe('parseFiaBusinessTaxRegistryLine', () => {
     const line = '"某路１號""A棟""",12345678,,"測試商行",1000,1010101,獨資,N,472913,菸酒零售,,,,,,';
     const row = parseFiaBusinessTaxRegistryLine(line);
     expect(row?.address).toBe('某路１號"A棟"');
+  });
+
+  it('collects secondary industry codes (行業代號1/2/3) when present, in original order', () => {
+    // 實測驗證（統編22099131台積電）：主要+兩個次要行業代號都在同一列裡，不是三筆不同的登記列。
+    const line = '"新竹市東　區科園里科學園區力行六路８號",22099131,,"台灣積體電路製造股份有限公司",259323700670,0760321,股份有限公司,Y,261199,其他積體電路製造,261111,矽晶圓製造,282011,一次電池製造,,';
+    const row = parseFiaBusinessTaxRegistryLine(line);
+    expect(row?.industryCodes).toEqual([
+      { code: '261199', name: '其他積體電路製造' },
+      { code: '261111', name: '矽晶圓製造' },
+      { code: '282011', name: '一次電池製造' },
+    ]);
+  });
+
+  it('skips blank secondary code slots instead of including empty entries', () => {
+    // 實測發現：常見情況是只有第一組次要代號有值，第二、三組是空字串（不是每家公司都有到三個次業）。
+    const line = '"南投縣中寮鄉中寮村鄉林巷４３號",61194605,,"和興商店",1000,0400711,獨資,N,472913,菸酒零售,471913,雜貨店,,,,';
+    const row = parseFiaBusinessTaxRegistryLine(line);
+    expect(row?.industryCodes).toEqual([
+      { code: '472913', name: '菸酒零售' },
+      { code: '471913', name: '雜貨店' },
+    ]);
   });
 
   it('returns null when the tax ID is not 8 digits', () => {

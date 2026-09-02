@@ -83,22 +83,25 @@ const TABLES: Record<string, TableSyncConfig> = {
   // company_industry_classifications 靠 tax_id 外鍵回 company_profiles、industry_code 外鍵回
   // tax_industry_classification——後者是靜態字典，用 prisma/seed.ts 灌，不是靠這支腳本同步。
   company_industry_classifications: {
+    // taxId 不再是唯一鍵（一家公司最多 4 列：主要+次要1/2/3，見 schema.prisma），改用 id 分頁；
+    // prod 端的 id 不需要跟 dev 對齊（沒有其他表用 FK 指到這個 id），upsert 靠 (tax_id, rank) 這組
+    // 唯一約束，不是 id。
     count: () => devDb.companyIndustryClassification.count(),
     findBatch: (cursor) =>
       devDb.companyIndustryClassification.findMany({
         take: BATCH_SIZE,
-        ...(cursor ? { skip: 1, cursor: { taxId: cursor as string } } : {}),
-        orderBy: { taxId: 'asc' },
+        ...(cursor ? { skip: 1, cursor: { id: cursor as number } } : {}),
+        orderBy: { id: 'asc' },
       }),
-    nextCursor: (row) => row.taxId,
+    nextCursor: (row) => row.id,
     rowToValues: (row) => Prisma.sql`(
-      ${row.taxId}, ${row.industryCode}, ${row.sourceIndustryName}, ${row.registeredAddress}, ${row.fetchedAt}::timestamp, ${row.updatedAt}::timestamp
+      ${row.taxId}, ${row.rank}, ${row.industryCode}, ${row.sourceIndustryName}, ${row.registeredAddress}, ${row.fetchedAt}::timestamp, ${row.updatedAt}::timestamp
     )`,
     upsertSql: (values) => Prisma.sql`
       INSERT INTO "company_industry_classifications"
-        ("tax_id", "industry_code", "source_industry_name", "registered_address", "fetched_at", "updated_at")
+        ("tax_id", "rank", "industry_code", "source_industry_name", "registered_address", "fetched_at", "updated_at")
       VALUES ${values}
-      ON CONFLICT ("tax_id") DO UPDATE SET
+      ON CONFLICT ("tax_id", "rank") DO UPDATE SET
         "industry_code" = EXCLUDED."industry_code",
         "source_industry_name" = EXCLUDED."source_industry_name",
         "registered_address" = EXCLUDED."registered_address",
