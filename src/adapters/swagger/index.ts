@@ -1,49 +1,29 @@
-import swaggerJSDoc from 'swagger-jsdoc';
+import { OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
 import swaggerUi from 'swagger-ui-express';
-import { join } from 'path';
 import { config } from '@/shared/config';
+import { registry } from '@/adapters/swagger/registry';
+// 只為了觸發副作用：每個 domain 的 route.ts 在自己模組頂層呼叫 registry.registerPath()，import
+// '@/routes' 會連帶 import 到全部 domain 的 route.ts，讓它們先把自己的端點登記進 registry，這個
+// 檔案才有東西可以產生文件。用 import 而不是要求呼叫端先自己 import routes 再 import 這裡——
+// module cache 保證 routes 只會真的執行一次，不管誰先 import，這裡自己 import 一次確保正確順序，
+// 不用依賴 src/index.ts 裡兩個 import 敘述的先後順序（那種依賴容易在之後改 import 順序時悄悄壞掉）。
+import '@/routes';
 
-// package.json 沒有 "type": "module"，所以 tsconfig 的 module: NodeNext 會把這個檔案編譯成
-// CommonJS（不是 ESM）——__dirname 因此是原生可用的全域變數，不能用 import.meta.url（CommonJS
-// 輸出下 TS 會直接編譯錯誤：TS1470）。跟 oingg-tpex-ts 的 adapters/swagger/index.ts 同一個道理。
+const generator = new OpenApiGeneratorV3(registry.definitions);
 
-// glob (used internally by swagger-jsdoc) treats `\` as an escape character, so
-// Windows-style paths from `join()` silently match zero files there. Normalize to `/`.
-const toGlobPath = (...segments: string[]) => join(...segments).split('\\').join('/');
-
-const options: swaggerJSDoc.Options = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'OINGG Gov API',
-      version: '1.0.0',
-      description: 'API documentation for the OINGG Taiwan government open data ingestion service',
-    },
-    servers: [
-      {
-        url: `http://localhost:${config.port}`,
-        description: 'Development server',
-      },
-    ],
-    components: {
-      securitySchemes: {
-        TaskSecret: {
-          type: 'apiKey',
-          in: 'header',
-          name: 'X-Task-Secret',
-        },
-      },
-    },
+export const swaggerSpec = generator.generateDocument({
+  openapi: '3.0.0',
+  info: {
+    title: 'OINGG Gov API',
+    version: '1.0.0',
+    description: 'API documentation for the OINGG Taiwan government open data ingestion service',
   },
-  // Path to the API docs. It's crucial to use absolute paths created with `join`. Glob matches
-  // both .ts and .js: dev runs src/*.ts directly via tsx, but the compiled prod build only has
-  // dist/*.js (see Dockerfile) — __dirname itself already shifts correctly between the two
-  // (src/adapters/swagger vs dist/adapters/swagger), only the extension needs to cover both.
-  apis: [
-    toGlobPath(__dirname, '../../domains/**/*.{ts,js}'),
-    toGlobPath(__dirname, '../../shared/**/*.{ts,js}'),
+  servers: [
+    {
+      url: `http://localhost:${config.port}`,
+      description: 'Development server',
+    },
   ],
-};
+});
 
-export const swaggerSpec = swaggerJSDoc(options);
 export { swaggerUi };

@@ -1,14 +1,10 @@
 import { type Request, type Response, type NextFunction } from 'ultimate-express';
-import { z } from 'zod';
 import { ingestQuarterlyGdp } from '@/domains/quarterlyGdp/service';
-
-const requestSchema = z.object({
-  force: z.boolean().optional().default(false), // true 時已存在的 (year, quarter, category) 也強制覆寫
-});
+import { forceIngestBodySchema } from '@/shared/openapiSchemas';
 
 export const ingestQuarterlyGdpController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const validationResult = requestSchema.safeParse(req.body ?? {});
+    const validationResult = forceIngestBodySchema.safeParse(req.body ?? {});
     if (!validationResult.success) {
       return res.status(400).json({
         message: 'Invalid request body.',

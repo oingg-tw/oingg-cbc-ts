@@ -15,7 +15,9 @@ const registerItemSchema = z.object({
   taxId: z.string().regex(/^\d{8}$/, '統一編號須為 8 碼數字'),
 });
 
-const registerBodySchema = z.object({
+// export 給 route.ts 用來註冊 OpenAPI 文件（zod-to-openapi）——同一份 schema 同時負責驗證跟出文件，
+// 不會有「文件寫的欄位」跟「實際接受的欄位」對不起來的風險。
+export const registerBodySchema = z.object({
   // 上限 200 筆：GCIS client 有節流（同一 process 內每次呼叫至少間隔 1 秒），一次收太多筆會讓單一
   // HTTP 請求跑很久，容易撞到呼叫端或反向代理的逾時，寧可讓呼叫端自己分批送。
   items: z.array(registerItemSchema).min(1, '至少要有一筆').max(200, '一次最多 200 筆，請分批送'),
@@ -89,7 +91,7 @@ export const refreshTrackedCompanyProfilesController = async (_req: Request, res
   }
 };
 
-const taxIdParamSchema = z.object({ taxId: z.string().regex(/^\d{8}$/, '統一編號須為 8 碼數字') });
+export const taxIdParamSchema = z.object({ taxId: z.string().regex(/^\d{8}$/, '統一編號須為 8 碼數字') });
 
 export const getCompanyProfileByTaxIdController = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -110,7 +112,7 @@ export const getCompanyProfileByTaxIdController = async (req: Request, res: Resp
   }
 };
 
-const stockCodeParamSchema = z.object({ stockCode: z.string().regex(/^[0-9A-Z]{4,6}$/, '證券代碼須為 4-6 碼英數字') });
+export const stockCodeParamSchema = z.object({ stockCode: z.string().regex(/^[0-9A-Z]{4,6}$/, '證券代碼須為 4-6 碼英數字') });
 
 export const getCompanyProfileByStockCodeController = async (req: Request, res: Response, next: NextFunction) => {
   try {
