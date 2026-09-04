@@ -4,7 +4,7 @@ substitutions:
   _SERVICE: oingg-gov-ts
 
 steps:
-  # 測試/型別檢查關卡：這兩個沒過，後面的 image build/deploy 都不會執行（Cloud Build steps 依序失敗即中止）。
+  # 測試/型別檢查/lint 關卡：這三個沒過，後面的 image build/deploy 都不會執行（Cloud Build steps 依序失敗即中止）。
   - id: test
     name: node:22-trixie-slim
     entrypoint: bash
@@ -21,6 +21,7 @@ steps:
         npx prisma generate
         pnpm test
         npx tsc --noEmit
+        pnpm lint
 
   - id: build
     name: gcr.io/cloud-builders/docker
