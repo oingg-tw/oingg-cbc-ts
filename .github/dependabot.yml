@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: "npm" # pnpm-lock.yaml 也吃這個 ecosystem key，Dependabot 支援 pnpm workspace
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      # zod 跟 zod-to-openapi 版本互相牽制（2026-09-04 才把 zod-to-openapi 從 7.3.4 升到 9.1.0，
+      # 連帶把 zod 從 3 升到 4——9.x 的 peer 要求 zod ^4.0.0）。分到同一組讓 Dependabot 只開「兩個
+      # 一起升」的 PR，不用 ignore 規則整個擋掉更新（那樣連安全性修補都收不到）。
+      zod:
+        patterns:
+          - "zod"
+          - "@asteasolutions/zod-to-openapi"
+      # 同樣道理：@prisma/client、@prisma/adapter-pg、prisma（CLI）三個套件版本必須完全一致，
+      # 混版本會在執行期出錯，不是型別層級的問題，分開升級風險很高。
+      prisma:
+        patterns:
+          - "prisma"
+          - "@prisma/client"
+          - "@prisma/adapter-pg"
+      # vitest 跟 @vitest/coverage-v8 也必須版本一致（2026-09-04 裝 coverage-v8 時已確認：裝
+      # @latest 會抓到比 vitest 新的版本、造成 peer 不相容）。
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/coverage-v8"
