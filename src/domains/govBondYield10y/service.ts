@@ -35,9 +35,12 @@ const recordIngestionRun = async (status: 'success' | 'failed', points: MonthlyG
   }
 };
 
-// CBC 這個端點本身不分頁、不需要重複請求，一次請求就拿到 1987-M5 至今整段月資料，逐月 upsert；
-// force 控制已存在的月份要不要覆寫（次級市場殖利率是歷史成交事實，理論上不會被事後修正，但保留
-// force 跟 MonthlyCpi domain 的做法一致，方便重跑時強制刷新）。
+// CBC 這個端點本身不分頁、不需要重複請求，一次請求就拿到 1987-M5 至今整段月資料。跟
+// quarterlyGdp/monthlyUnemploymentRate 一樣用整批寫入，不是逐月 findUnique+upsert——後者在 Neon
+// 的網路延遲下每筆兩次往返，量一大就很慢（monthlyCpi 4,376 筆實測跑了近 10 分鐘，這個 domain 只有
+// 369 筆問題不大，但改成同一套寫法純粹圖一致，之後有人抄這個 domain 當範本不會抄到慢的版本）。
+// force 時整批刪除重建，不 force 時用 createMany({ skipDuplicates: true }) 讓唯一約束處理「已存在
+// 就跳過」。
 export const ingestMonthlyGovBondYield10y = async (force = false): Promise<IngestGovBondYield10yResult> => {
   let raw;
   try {
@@ -55,25 +58,18 @@ export const ingestMonthlyGovBondYield10y = async (force = false): Promise<Inges
     return { success: false, totalPoints: 0, fetched: 0, skipped: 0, error: error instanceof Error ? error.message : String(error) };
   }
 
-  let fetched = 0;
-  let skipped = 0;
-  for (const point of points) {
-    const where = { year_month: { year: point.year, month: point.month } };
+  const data = points.map((p) => ({ year: p.year, month: p.month, yieldRate: p.yieldRate }));
 
-    if (!force) {
-      const existing = await prisma.monthlyGovBondYield10y.findUnique({ where });
-      if (existing) {
-        skipped++;
-        continue;
-      }
-    }
-
-    await prisma.monthlyGovBondYield10y.upsert({
-      where,
-      create: { year: point.year, month: point.month, yieldRate: point.yieldRate },
-      update: { yieldRate: point.yieldRate },
-    });
-    fetched++;
+  let fetched: number;
+  let skipped: number;
+  if (force) {
+    await prisma.$transaction([prisma.monthlyGovBondYield10y.deleteMany({}), prisma.monthlyGovBondYield10y.createMany({ data })]);
+    fetched = points.length;
+    skipped = 0;
+  } else {
+    const result = await prisma.monthlyGovBondYield10y.createMany({ data, skipDuplicates: true });
+    fetched = result.count;
+    skipped = points.length - result.count;
   }
 
   await recordIngestionRun('success', points);

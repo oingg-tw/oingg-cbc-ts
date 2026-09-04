@@ -33,9 +33,10 @@ const recordIngestionRun = async (status: 'success' | 'failed', points: MonthlyC
   }
 };
 
-// 跟 gov-bond-yield-10y 一樣，這個端點本身不分頁、一次請求就拿到整段月資料，逐點 upsert；force
-// 控制已存在的 (year, month, category) 要不要覆寫——CPI 原始值理論上不會被事後修正，但主計總處偶爾
-// 會回溯調整權數/基期，保留 force 供重跑時強制刷新。
+// 跟 quarterlyGdp/monthlyUnemploymentRate 一樣用整批寫入，不是逐點 findUnique+upsert——這個 domain
+// 4,376 筆，逐點兩次資料庫往返在 Neon 的網路延遲下實測跑了近 10 分鐘，改成 createMany 之後幾秒鐘
+// 就能跑完（見 quarterlyGdp/service.ts 的說明，同一套理由）。force 時整批刪除重建，不 force 時用
+// createMany({ skipDuplicates: true }) 讓 (year, month, category) 的唯一約束處理「已存在就跳過」。
 export const ingestMonthlyCpi = async (force = false): Promise<IngestMonthlyCpiResult> => {
   let xml: string;
   try {
@@ -53,25 +54,18 @@ export const ingestMonthlyCpi = async (force = false): Promise<IngestMonthlyCpiR
     return { success: false, totalPoints: 0, fetched: 0, skipped: 0, error: error instanceof Error ? error.message : String(error) };
   }
 
-  let fetched = 0;
-  let skipped = 0;
-  for (const point of points) {
-    const where = { year_month_category: { year: point.year, month: point.month, category: point.category } };
+  const data = points.map((p) => ({ year: p.year, month: p.month, category: p.category, indexValue: p.indexValue, yoyChangePercent: p.yoyChangePercent }));
 
-    if (!force) {
-      const existing = await prisma.monthlyCpi.findUnique({ where });
-      if (existing) {
-        skipped++;
-        continue;
-      }
-    }
-
-    await prisma.monthlyCpi.upsert({
-      where,
-      create: { year: point.year, month: point.month, category: point.category, indexValue: point.indexValue, yoyChangePercent: point.yoyChangePercent },
-      update: { indexValue: point.indexValue, yoyChangePercent: point.yoyChangePercent },
-    });
-    fetched++;
+  let fetched: number;
+  let skipped: number;
+  if (force) {
+    await prisma.$transaction([prisma.monthlyCpi.deleteMany({}), prisma.monthlyCpi.createMany({ data })]);
+    fetched = points.length;
+    skipped = 0;
+  } else {
+    const result = await prisma.monthlyCpi.createMany({ data, skipDuplicates: true });
+    fetched = result.count;
+    skipped = points.length - result.count;
   }
 
   await recordIngestionRun('success', points);
